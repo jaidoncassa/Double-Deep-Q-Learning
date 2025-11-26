@@ -78,22 +78,22 @@ class MetricLogger:
                 f"{self.curr_ep_reward:15.3f}{ep_avg_loss:15.3f}{self.curr_ep_length:15d}\n"
             )
 
-        # Plotting the raw episode-by-episode data (FIXED)
-        plot_metrics = {
-            "ep_rewards_step": self.ep_rewards_step_plot,
-            "ep_losses_step": self.ep_losses_step_plot,
-        }
+        # # Plotting the raw episode-by-episode data (FIXED)
+        # plot_metrics = {
+        #     "ep_rewards_step": self.ep_rewards_step_plot,
+        #     "ep_losses_step": self.ep_losses_step_plot,
+        # }
         
-        for metric_name, file_path in plot_metrics.items():
-            plt.clf()
-            plt.plot(
-                # Correct access: use metric_name (e.g., "ep_rewards_step")
-                getattr(self, metric_name), 
-                label=metric_name.replace("ep_", "raw_")
-            )
-            plt.legend()
-            # Correct saving: use the pre-defined file path
-            plt.savefig(file_path)
+        # for metric_name, file_path in plot_metrics.items():
+        #     plt.clf()
+        #     plt.plot(
+        #         # Correct access: use metric_name (e.g., "ep_rewards_step")
+        #         getattr(self, metric_name), 
+        #         label=metric_name.replace("ep_", "raw_")
+        #     )
+        #     plt.legend()
+        #     # Correct saving: use the pre-defined file path
+        #     plt.savefig(file_path)
 
         self.init_episode()
 
@@ -126,10 +126,31 @@ class MetricLogger:
                 f"{datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S'):>20}\n"
             )
 
-        for metric in ["ep_lengths", "ep_avg_losses", "ep_avg_qs", "ep_rewards"]:
+        # for metric in ["ep_lengths", "ep_avg_losses", "ep_avg_qs", "ep_rewards"]:
+        #     plt.clf()
+        #     plt.plot(
+        #         getattr(self, f"moving_avg_{metric}"), label=f"moving_avg_{metric}"
+        #     )
+        #     plt.legend()
+        #     plt.savefig(getattr(self, f"{metric}_plot"))
+
+    def save_plots(self):
+        plot_metrics = {
+            "ep_rewards": self.ep_rewards_plot,
+            "ep_lengths": self.ep_lengths_plot,
+            "ep_avg_losses": self.ep_avg_losses_plot,
+            "ep_avg_qs": self.ep_avg_qs_plot,
+            "ep_rewards_step": self.ep_rewards_step_plot,
+            "ep_losses_step": self.ep_losses_step_plot,
+        }
+
+        for metric_name, file_path in plot_metrics.items():
             plt.clf()
             plt.plot(
-                getattr(self, f"moving_avg_{metric}"), label=f"moving_avg_{metric}"
+                # Correct access: use metric_name (e.g., "ep_rewards")
+                getattr(self, f"moving_avg_{metric_name}"), 
+                label=f"moving_avg_{metric_name}"
             )
             plt.legend()
-            plt.savefig(getattr(self, f"{metric}_plot"))
+            # Correct saving: use the pre-defined file path
+            plt.savefig(file_path)

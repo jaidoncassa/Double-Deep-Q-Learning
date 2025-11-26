@@ -7,118 +7,125 @@ import numpy as np
 import random
 import torch
 
-USE_DOUBLE_DQN = False
-ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
+# USE_DOUBLE_DQN = False
+# ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-# Initialize the environment
-seed = 40
-env = gym.make("CartPole-v1")
+algorithms = ["DDQN", "DQN"]
+seeds = [42, 123]
+environments = ["CartPole-v1"]
 
-# Seed everything
-# env.observation_space.seed(seed)
-# env.action_space.seed(seed)
-# torch.manual_seed(seed)
-# random.seed(seed)
-# env.reset(seed=seed)
+for game in environments:
+    for seed in seeds:
+        for ALGO_NAME in algorithms:
 
-# Environment settings
-state, _ = env.reset()
-MAX_TOTAL_EPISODES = 600
-n_observations = len(state)
-num_actions = env.action_space.n
+            print(f"Training with seed: {seed}")
+            # Initialize the environment
+            env = gym.make(game)
 
+            # Seed everything
+            env.observation_space.seed(seed)
+            env.action_space.seed(seed)
+            torch.manual_seed(seed)
+            random.seed(seed)
+            env.reset(seed=seed)
 
-# Agent settings
-update_target_frequency = 1
-max_steps_per_episode = 500
-buffer_size = 10_000
-update_frequency = 1
-batch_size = 128
-EPS_START = 0.9
-EPS_END = 0.01
-EPS_DECAY = 2_500
-# epsilon_decay = (start_epsilon - final_epsilon) / (epsilon_decay_steps)
-discount = 0.99
+            # Environment settings
+            state, _ = env.reset()
+            MAX_TOTAL_EPISODES = 600
+            n_observations = len(state)
+            num_actions = env.action_space.n
 
-# model parameters
-LR = 3e-4
+            # Agent settings
+            update_target_frequency = 1
+            max_steps_per_episode = 500
+            buffer_size = 10_000
+            update_frequency = 1
+            batch_size = 128
+            EPS_START = 0.9
+            EPS_END = 0.01
+            EPS_DECAY = 2_500
+            discount = 0.99
 
-# initalize the agent
-AgentClass = CartPoleDDQNAgent if USE_DOUBLE_DQN else CartPoleDQNAgent
-agent = AgentClass(
-    env=env,
-    num_actions=num_actions,
-    n_obs=n_observations,
-    initial_epsilon=EPS_START,
-    epsilon_decay=EPS_DECAY,
-    final_epsilon=EPS_END,
-    discount_factor=discount,
-    buffer_size=buffer_size,
-    batch_size=batch_size,
-    update_frequency=update_frequency,
-    update_target_frequency=update_target_frequency,
-    model_lr=LR,
-    seed=seed,
-)
+            # model parameters
+            LR = 3e-4
 
-# Saving settings
-save_dir = Path(f"CartPole_Environment/cartpole_{ALGO_NAME.lower()}/checkpoints")
-save_dir.mkdir(parents=True, exist_ok=True)
-logger = MetricLogger(save_dir)
+            # initalize the agent
+            AgentClass = CartPoleDDQNAgent if ALGO_NAME == "DDQN" else CartPoleDQNAgent
+            agent = AgentClass(
+                env=env,
+                num_actions=num_actions,
+                n_obs=n_observations,
+                initial_epsilon=EPS_START,
+                epsilon_decay=EPS_DECAY,
+                final_epsilon=EPS_END,
+                discount_factor=discount,
+                buffer_size=buffer_size,
+                batch_size=batch_size,
+                update_frequency=update_frequency,
+                update_target_frequency=update_target_frequency,
+                model_lr=LR,
+                seed=seed,
+            )
 
-# Metric tracking
-episode_count = 0
-total_frames = 0
+            # Saving settings
+            save_dir = Path(f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/")
+            save_dir.mkdir(parents=True, exist_ok=True)
+            logger = MetricLogger(save_dir)
 
-pbar = tqdm(
-    total=MAX_TOTAL_EPISODES,
-    desc=f"Training {ALGO_NAME}",
-    dynamic_ncols=True,
-    leave=True,
-)
-while episode_count < MAX_TOTAL_EPISODES:
-    state, _ = env.reset()  # (s)
-    action = agent.agent_start(state)  # (a)
-    episode_reward = 0.0
+            # Metric tracking
+            episode_count = 0
+            total_frames = 0
 
-    # Play one game until max steps
-    for timestep in range(1, max_steps_per_episode + 1):
-        # Agent makes action in environment (s, a), we get in return (s', R)
-        next_state, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
+            pbar = tqdm(
+                total=MAX_TOTAL_EPISODES,
+                desc=f"Training {ALGO_NAME}",
+                dynamic_ncols=True,
+                leave=True,
+            )
+            while episode_count < MAX_TOTAL_EPISODES:
+                state, _ = env.reset()  # (s)
+                action = agent.agent_start(state)  # (a)
+                episode_reward = 0.0
 
-        # Update stats
-        episode_reward += reward
-        total_frames += 1
+                # Play one game until max steps
+                for timestep in range(1, max_steps_per_episode + 1):
+                    # Agent makes action in environment (s, a), we get in return (s', R)
+                    next_state, reward, terminated, truncated, info = env.step(action)
+                    done = terminated or truncated
 
-        if terminated:
-            loss, q = agent.agent_end(reward)
-        else:
-            action, loss, q = agent.agent_step(next_state, reward)
+                    # Update stats
+                    episode_reward += reward
+                    total_frames += 1
 
-        # log a step
-        logger.log_step(reward, loss, q)
+                    if terminated:
+                        loss, q = agent.agent_end(reward)
+                    else:
+                        action, loss, q = agent.agent_step(next_state, reward)
 
-        if done:
-            break
+                    # log a step
+                    logger.log_step(reward, loss, q)
 
-    # Episode end
-    episode_count += 1
-    logger.log_episode()
+                    if done:
+                        break
 
-    pbar.update(1)
+                # Episode end
+                episode_count += 1
+                logger.log_episode()
 
-    # Record and print moving averages (every 10 episodes is common)
-    if episode_count % 10 == 0:
-        logger.record(episode_count, agent.eps_threshold, total_frames)
+                pbar.update(1)
 
-pbar.close()
-env.close()
-torch.save(
-    agent.main_net.state_dict(),
-    f"CartPole_Environment/cartpole_{ALGO_NAME}_agent.pt",
-)
-torch.save(
-    agent.delayed_net.state_dict(),
-    f"CartPole_Environment/cartpole_{ALGO_NAME}_target_agent.pt",
-)
+                # Record and print moving averages (every 10 episodes is common)
+                if episode_count % 10 == 0:
+                    logger.record(episode_count, agent.eps_threshold, total_frames)
+
+            logger.save_plots()
+            pbar.close()
+            env.close()
+            torch.save(
+                agent.main_net.state_dict(),
+                f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_agent.pt",
+            )
+            torch.save(
+                agent.delayed_net.state_dict(),
+                f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_target_agent.pt",
+            )

@@ -43,7 +43,7 @@ class DQN:
         self.num_actions = num_actions
 
         # Create a random number generator with the provided seed to seed the agent for reproducibility
-        # self.random_generator = np.random.RandomState(seed)
+        self.random_generator = np.random.RandomState(seed)
         self.discount_factor = discount_factor
 
         # Neural Network initialization steps
@@ -196,7 +196,7 @@ class DQN:
         # Increase number of frames seen
         self.incr_count()
 
-        sample = random.random()
+        sample = self.random_generator.random()
         if sample < self.eps_threshold:
             return self.env.action_space.sample()
 
@@ -419,9 +419,8 @@ class DDQN(DQN):
         ) + reward_batch
 
         # 7. Compute Loss
-        loss = self.criterion(
-            state_action_values, expected_state_action_values.unsqueeze(1)
-        )
+        criterion = nn.SmoothL1Loss()
+        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
         # 8. Optimize the model
         self.optimizer.zero_grad()
