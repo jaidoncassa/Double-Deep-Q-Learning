@@ -1,5 +1,5 @@
-import torchvision.transforms as transforms
 from Neural_Networks import CNN, MLP
+from collections import namedtuple
 from collections import deque
 import torch.optim as optim
 import gymnasium as gym
@@ -43,8 +43,6 @@ class DQN:
 
         # Create a random number generator with the provided seed to seed the agent for reproducibility
         self.random_generator = np.random.RandomState(seed)
-
-        self.q_values = ...
         self.discount_factor = discount_factor
 
         # Exploration parameters
@@ -62,6 +60,7 @@ class DQN:
 
         # keep track of observations fixed FIFI queue implementation
         self.replay_buffer = deque(maxlen=buffer_size)  # HYPERPARAM
+        self.Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
         self.batch_size = batch_size
         self.frame_count = 0
 
@@ -72,7 +71,7 @@ class DQN:
             self.main_net.parameters(),
             lr=self.model_lr,
             alpha=0.95,
-            eps=0.01,
+            eps=1e-5,
             centered=True,
         )
 
@@ -92,41 +91,61 @@ class DQN:
 
         # Randomly sample from reply buffer of the form (theta(s), a, R, theta(s'))
         samples = random.sample(self.replay_buffer, k=self.batch_size)
+        batch = self.Transition(*zip(*samples))
 
-        bootstrap_targets = []
-        predicted_labels = []
-        for s1, a, r, s2, done in samples:
-            # Initalize to tensor object
-            label = torch.tensor(r, dtype=torch.float32, device=self.device)
-            if not done:
-                with torch.no_grad():
-                    # [Q(s', a1; delayed), ...]
-                    q_vals = self.delayed_net(s2)
+        # 3. Process States, Actions, and Rewards
+        # The states were saved as NumPy arrays, so we need to transform and cat them.
+        # We also need to filter out None next_states (terminal states)
+        
+        # Identify non-final next states for mask
+        non_final_next_states_np = [s for s in batch.next_state if s is not None]
+        non_final_mask = torch.tensor(
+            [s is not None for s in batch.next_state], device=self.device, dtype=torch.bool
+        )
 
-                    # yi = r + y*argmaxQ(s', a'; delayed)
-                    label += self.discount_factor * torch.max(q_vals)
+        # Transform and concatenate all batch elements
+        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        action_batch = torch.tensor(batch.action, dtype=torch.long, device=self.device).unsqueeze(1)
+        reward_batch = torch.tensor(batch.reward, dtype=torch.float32, device=self.device)
+        
+        # Transform and concatenate non-final next states
+        if non_final_next_states_np:
+            non_final_next_states = torch.cat([self.transform(s) for s in non_final_next_states_np])
+        else:
+            non_final_next_states = torch.empty(0, state_batch.shape[1], device=self.device) # Handle empty case
 
-            # Predict Q(s, a; main)
-            prediction = self.main_net(s1).squeeze(0)[a]
+        # --- Q-Value Calculation ---
 
-            # Append to trackers
-            bootstrap_targets.append(label)
-            predicted_labels.append(prediction)
+        # 4. Compute Q(s_t, a) from the main network (State Action Values)
+        # policy_net(state_batch) gives Q(s_t) for all actions. gather(1, action_batch) selects the Q-value for the action taken.
+        state_action_values = self.main_net(state_batch)
+        state_action_values = state_action_values.gather(1, action_batch)
 
-        # Convert python lists to tensors
-        bootstrap_targets = torch.stack(bootstrap_targets)
-        predicted_labels = torch.stack(predicted_labels)
+        # 5. Compute the Target V(s_{t+1}) for all next states
+        next_state_values = torch.zeros(self.batch_size, device=self.device)
+        with torch.no_grad():
+            if non_final_next_states.numel() > 0:
+                # DQN logic: max_a Q(s', a; target)
+                next_state_values[non_final_mask] = self.delayed_net(non_final_next_states).max(1).values
+        
+        # 6. Compute Expected Q Values (Bellman Target)
+        # Expected Q = R + gamma * V(s_{t+1})
+        expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
-        # Calculate average loss
-        loss = self.criterion(predicted_labels, bootstrap_targets)
+        # 7. Compute Loss
+        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-        # Backprop
+        # 8. Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
+        
+        # *** ADDED: GRADIENT CLIPPING FOR STABILITY ***
+        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=10)
+        
         self.optimizer.step()
 
-        # average Q(s, a) value
-        avg_q_value = torch.mean(predicted_labels).item()
+        # Average Q(s, a) value
+        avg_q_value = torch.mean(state_action_values).item()
 
         # Return the loss and the average Q-value for logging
         return loss.item(), avg_q_value
@@ -156,8 +175,6 @@ class DQN:
         """
         # Turn numpy array into Tensor obj
         input = self.transform(state)
-
-        # Tell Pytorch object not to track the gradient
         with torch.no_grad():
             # Predict the Q(s, a) values!
             q_values = self.main_net(input)
@@ -166,7 +183,7 @@ class DQN:
         action = self.get_action(q_values)
 
         # Mark down some facts
-        self.prev_state = input  # s
+        self.prev_state = state  # s
         self.prev_action = action  # a
 
         return action
@@ -186,40 +203,32 @@ class DQN:
         # Save the full observation (s, a, R, s')
         self.incr_count()
 
+        # Save observation
+        obs = (self.prev_state, self.prev_action, reward, state, False)
+        self.replay_buffer.append(obs)
+
         # Turn into Torcher vector
         input = self.transform(state)
-
-        # Tell Pytorch object not to track the gradient
         with torch.no_grad():
             # Predict the Q(s, a) values!
-            q_values = self.main_net(input)
+            q_values = self.main_net(input).squeeze(0)
 
         # Get the action and return it to the main controller
         action = self.get_action(q_values)
 
-        # Save observation
-        obs = (self.prev_state, self.prev_action, reward, input, False)
-        self.replay_buffer.append(obs)
-
-        # Update trackers
-        self.prev_state = input  # s
-        self.prev_action = action  # a'
-
         # Update the weights of the Neural Network every n steps past 32 steps
         q = None
         loss = None
-        if (
-            self.frame_count % self.update_frequency == 0
-            and len(self.replay_buffer) > self.batch_size
-        ):
+        if ( self.frame_count % self.update_frequency == 0 and len(self.replay_buffer) > self.batch_size):
             loss, q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
-        if (
-            self.frame_count > 0
-            and self.frame_count % self.update_target_frequency == 0
-        ):
+        if (self.frame_count > 0 and self.frame_count % self.update_target_frequency == 0):
             self.reset_target_network()
+
+        # Update trackers
+        self.prev_state = state  # s
+        self.prev_action = action  # a'
 
         self.update_epsilon()
         return action, loss, q
@@ -238,17 +247,11 @@ class DQN:
         # Update the weights of the Neural Network every n steps past batch_size steps
         q = None
         loss = None
-        if (
-            self.frame_count % self.update_frequency == 0
-            and len(self.replay_buffer) > self.batch_size
-        ):
+        if (self.frame_count % self.update_frequency == 0 and len(self.replay_buffer) > self.batch_size):
             loss, q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
-        if (
-            self.frame_count > 0
-            and self.frame_count % self.update_target_frequency == 0
-        ):
+        if (self.frame_count > 0 and self.frame_count % self.update_target_frequency == 0):
             self.reset_target_network()
 
         self.update_epsilon()
@@ -257,9 +260,8 @@ class DQN:
         self.prev_action = None
         return loss, q
 
-    def transform(self, img):
-        # Must normalize and turn into a tensor object
-        return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+    def transform(self, state):
+        return torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
     def incr_count(self):
         self.frame_count += 1
@@ -311,48 +313,62 @@ class DDQN(DQN):
 
         # Randomly sample from reply buffer of the form (theta(s), a, R, theta(s'))
         samples = random.sample(self.replay_buffer, k=self.batch_size)
+        batch = self.Transition(*zip(*samples))
 
-        bootstrap_targets = []
-        predicted_labels = []
-        for s1, a, r, s2, done in samples:
+        # 3. Process States, Actions, and Rewards
+        # Identify non-final next states for mask
+        non_final_next_states_np = [s for s in batch.next_state if s is not None]
+        non_final_mask = torch.tensor(
+            [s is not None for s in batch.next_state], device=self.device, dtype=torch.bool
+        )
+        
+        # Transform and concatenate all batch elements
+        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        action_batch = torch.tensor(batch.action, dtype=torch.long, device=self.device).unsqueeze(1)
+        reward_batch = torch.tensor(batch.reward, dtype=torch.float32, device=self.device)
+        
+        # Transform and concatenate non-final next states
+        if non_final_next_states_np:
+            non_final_next_states = torch.cat([self.transform(s) for s in non_final_next_states_np])
+        else:
+            non_final_next_states = torch.empty(0, state_batch.shape[1], device=self.device)
 
-            # Initalize to tensor object
-            yi = torch.tensor(r, dtype=torch.float32, device=self.device)
-            if not done:
-                with torch.no_grad():
+        # 4. Compute Q(s_t, a) from the main network (State Action Values)
+        state_action_values = self.main_net(state_batch).gather(1, action_batch)
 
-                    # Choose greedily argmaxQ(s', a; main)
-                    greedy_action = self.main_net(s2).argmax().item()
+        # --- DDQN Q-Value Calculation ---
 
-                    # Evaluate the greedy decision Q(s', argmaxQ(s', a; main); delayed)
-                    q_val = self.delayed_net(s2).squeeze(0)[greedy_action]
+        # 5. Compute the Target V(s_{t+1}) for all next states
+        next_state_values = torch.zeros(self.batch_size, device=self.device)
+        with torch.no_grad():
+            if non_final_next_states.numel() > 0:
+                # DDQN Logic: Use main_net to SELECT action, target_net to EVALUATE
+                
+                # Selection: argmax_a Q(s', a; main)
+                # Find the action indices that maximize Q in the MAIN network
+                best_actions = self.main_net(non_final_next_states).argmax(1).unsqueeze(1)
+                
+                # Evaluation: Q(s', best_action; target)
+                # Use those indices to look up the Q-value from the TARGET network
+                next_state_values[non_final_mask] = self.delayed_net(non_final_next_states).gather(1, best_actions).squeeze(1)
 
-                    # yi = r + y*argmaxQ(s', a'; delayed)
-                    yi += self.discount_factor * q_val
+        # 6. Compute Expected Q Values (Bellman Target)
+        expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
-            # Predict Q(s, a; main)
-            prediction = self.main_net(s1).squeeze(0)[a]
+        # 7. Compute Loss
+        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-            # Append to trackers
-            bootstrap_targets.append(yi)
-            predicted_labels.append(prediction)
-
-        # Convert python lists to tensors
-        bootstrap_targets = torch.stack(bootstrap_targets)
-        predicted_labels = torch.stack(predicted_labels)
-
-        # Calculate average loss (yi - Q(s, a))
-        loss = self.criterion(predicted_labels, bootstrap_targets)
-
-        # Backprop
+        # 8. Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
-
-        # w <-- w + lr(yi - Q(s, a; main))Gradient
+        
+        # *** ADDED: GRADIENT CLIPPING FOR STABILITY ***
+        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
+        
         self.optimizer.step()
 
-        # average Q(s, a; main) value
-        avg_q_value = torch.mean(predicted_labels).item()
+        # Average Q(s, a) value
+        avg_q_value = torch.mean(state_action_values).item()
 
         # Return the loss and the average Q-value for logging
         return loss.item(), avg_q_value
@@ -438,7 +454,7 @@ class McPacmanDDQNAgent(DDQN):
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
 
-class LunarLandingDQNAgent(DQN):
+class CartPoleDQNAgent(DQN):
     def __init__(
         self,
         env: gym.Env,
@@ -473,12 +489,8 @@ class LunarLandingDQNAgent(DQN):
             seed,
         )
 
-    def transform(self, state):
-        t = torch.tensor(state, dtype=torch.float32, device=self.device)
-        return t.unsqueeze(0)
 
-
-class LunarLandingDDQNAgent(DDQN):
+class CartPoleDDQNAgent(DDQN):
     def __init__(
         self,
         env: gym.Env,
@@ -512,7 +524,3 @@ class LunarLandingDDQNAgent(DDQN):
             delayed,
             seed,
         )
-
-    def transform(self, state):
-        t = torch.tensor(state, dtype=torch.float32, device=self.device)
-        return t.unsqueeze(0)

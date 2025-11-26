@@ -6,22 +6,35 @@ import matplotlib.pyplot as plt
 class MetricLogger:
     def __init__(self, save_dir):
         self.save_log = save_dir / "log"
+        self.save_step_log = save_dir / "episode_metrics.csv"
         with open(self.save_log, "w") as f:
             f.write(
                 f"{'Episode':>8}{'Step':>8}{'Epsilon':>10}{'MeanReward':>15}"
                 f"{'MeanLength':>15}{'MeanLoss':>15}{'MeanQValue':>15}"
                 f"{'TimeDelta':>15}{'Time':>20}\n"
             )
+        with open(self.save_step_log, "w") as f:
+            f.write(
+                f"{'Reward':>15}{'Loss':>15}{'Length':>15}\n"
+            )
+
         self.ep_rewards_plot = save_dir / "reward_plot.jpg"
         self.ep_lengths_plot = save_dir / "length_plot.jpg"
         self.ep_avg_losses_plot = save_dir / "loss_plot.jpg"
         self.ep_avg_qs_plot = save_dir / "q_plot.jpg"
+
+        self.ep_rewards_step_plot = save_dir / "reward_step_plot.jpg"
+        self.ep_losses_step_plot = save_dir / "loss_step_plot.jpg"
 
         # History metrics
         self.ep_rewards = []
         self.ep_lengths = []
         self.ep_avg_losses = []
         self.ep_avg_qs = []
+
+        # Per epsiode step metrics
+        self.ep_rewards_step = []
+        self.ep_losses_step = []
 
         # Moving averages, added for every call to record()
         self.moving_avg_ep_rewards = []
@@ -55,6 +68,32 @@ class MetricLogger:
             ep_avg_q = np.round(self.curr_ep_q / self.curr_ep_loss_length, 5)
         self.ep_avg_losses.append(ep_avg_loss)
         self.ep_avg_qs.append(ep_avg_q)
+
+        self.ep_rewards_step.append(self.curr_ep_reward)
+        self.ep_losses_step.append(ep_avg_loss)
+
+        # Log to step file (Correctly writing raw data)
+        with open(self.save_step_log, "a") as f:
+            f.write(
+                f"{self.curr_ep_reward:15.3f}{ep_avg_loss:15.3f}{self.curr_ep_length:15d}\n"
+            )
+
+        # Plotting the raw episode-by-episode data (FIXED)
+        plot_metrics = {
+            "ep_rewards_step": self.ep_rewards_step_plot,
+            "ep_losses_step": self.ep_losses_step_plot,
+        }
+        
+        for metric_name, file_path in plot_metrics.items():
+            plt.clf()
+            plt.plot(
+                # Correct access: use metric_name (e.g., "ep_rewards_step")
+                getattr(self, metric_name), 
+                label=metric_name.replace("ep_", "raw_")
+            )
+            plt.legend()
+            # Correct saving: use the pre-defined file path
+            plt.savefig(file_path)
 
         self.init_episode()
 

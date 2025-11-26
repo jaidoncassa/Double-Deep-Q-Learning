@@ -24,13 +24,11 @@ class CNN(nn.Module):
 class MLP(nn.Module):
     def __init__(self, num_actions):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(8, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, num_actions),
-        )
+        self.layer1 = nn.Linear(4, 128)
+        self.layer2 = nn.Linear(128, 128)
+        self.layer3 = nn.Linear(128, num_actions)
 
     def forward(self, x):
-        return self.net(x)
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        return self.layer3(x)

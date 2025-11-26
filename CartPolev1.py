@@ -1,4 +1,4 @@
-from Agents import LunarLandingDDQNAgent, LunarLandingDQNAgent
+from Agents import CartPoleDQNAgent, CartPoleDDQNAgent
 from Metrics import MetricLogger
 from tqdm.auto import tqdm
 from pathlib import Path
@@ -6,12 +6,13 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-USE_DOUBLE_DQN = False
+USE_DOUBLE_DQN = True
 ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
 # Initialize the environment
 seed = 0
-env = gym.make("LunarLanderBare-v0")
+env = gym.make("CartPole-v1")
+
 
 # Seed everything
 env.observation_space.seed(seed)
@@ -22,26 +23,26 @@ np.random.seed(seed)
 
 
 # Settings part 1
-update_target_frequency = 1000
-max_steps_per_episode = 1000
-MAX_TOTAL_EPISODES = 500
-buffer_size = 50_000
+update_target_frequency = 200
+max_steps_per_episode = 500
+MAX_TOTAL_EPISODES = 600
+buffer_size = 10_000
 update_frequency = 4
-batch_size = 64
+batch_size = 128
 
 # Settings part 2, won't really change these
-start_epsilon = 1.0
-final_epsilon = 0.05
-epsilon_decay_steps = 50_000
+start_epsilon = 0.99
+final_epsilon = 0.01
+epsilon_decay_steps = 2_500
 epsilon_decay = (start_epsilon - final_epsilon) / (epsilon_decay_steps)
 num_actions = env.action_space.n
 discount = 0.99
 
 # model parameters
-mlp_lr = 1e-3
+mlp_lr = 3e-4
 
 # initalize the agent
-AgentClass = LunarLandingDDQNAgent if USE_DOUBLE_DQN else LunarLandingDQNAgent
+AgentClass = CartPoleDDQNAgent if USE_DOUBLE_DQN else CartPoleDQNAgent
 agent = AgentClass(
     env=env,
     num_actions=num_actions,
@@ -57,7 +58,11 @@ agent = AgentClass(
     seed=seed,
 )
 
-save_dir = Path(f"LunarLanding_Environment/lunarlander_{ALGO_NAME.lower()}/checkpoints")
+# Environment information
+num_actions = env.action_space.n
+episode_over = False
+
+save_dir = Path(f"CartPole_Environment/cartpole_{ALGO_NAME.lower()}/checkpoints")
 save_dir.mkdir(parents=True, exist_ok=True)
 logger = MetricLogger(save_dir)
 
@@ -111,5 +116,9 @@ pbar.close()
 env.close()
 torch.save(
     agent.main_net.state_dict(),
-    f"LunarLanding_Environment/lunarlander_{ALGO_NAME}_agent.pt",
+    f"CartPole_Environment/cartpole_{ALGO_NAME}_agent.pt",
+)
+torch.save(
+    agent.delayed_net.state_dict(),
+    f"CartPole_Environment/cartpole_{ALGO_NAME}_target_agent.pt",
 )
