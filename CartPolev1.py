@@ -4,64 +4,64 @@ from tqdm.auto import tqdm
 from pathlib import Path
 import gymnasium as gym
 import numpy as np
+import random
 import torch
 
-USE_DOUBLE_DQN = True
+USE_DOUBLE_DQN = False
 ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
 # Initialize the environment
-seed = 0
+seed = 40
 env = gym.make("CartPole-v1")
 
-
 # Seed everything
-env.observation_space.seed(seed)
-env.action_space.seed(seed)
-torch.manual_seed(seed)
-env.reset(seed=seed)
-np.random.seed(seed)
+# env.observation_space.seed(seed)
+# env.action_space.seed(seed)
+# torch.manual_seed(seed)
+# random.seed(seed)
+# env.reset(seed=seed)
 
-
-# Settings part 1
-update_target_frequency = 200
-max_steps_per_episode = 500
+# Environment settings
+state, _ = env.reset()
 MAX_TOTAL_EPISODES = 600
-buffer_size = 10_000
-update_frequency = 4
-batch_size = 128
-
-# Settings part 2, won't really change these
-start_epsilon = 0.99
-final_epsilon = 0.01
-epsilon_decay_steps = 2_500
-epsilon_decay = (start_epsilon - final_epsilon) / (epsilon_decay_steps)
+n_observations = len(state)
 num_actions = env.action_space.n
+
+
+# Agent settings
+update_target_frequency = 1
+max_steps_per_episode = 500
+buffer_size = 10_000
+update_frequency = 1
+batch_size = 128
+EPS_START = 0.9
+EPS_END = 0.01
+EPS_DECAY = 2_500
+# epsilon_decay = (start_epsilon - final_epsilon) / (epsilon_decay_steps)
 discount = 0.99
 
 # model parameters
-mlp_lr = 3e-4
+LR = 3e-4
 
 # initalize the agent
 AgentClass = CartPoleDDQNAgent if USE_DOUBLE_DQN else CartPoleDQNAgent
 agent = AgentClass(
     env=env,
     num_actions=num_actions,
-    initial_epsilon=start_epsilon,
-    epsilon_decay=epsilon_decay,
-    final_epsilon=final_epsilon,
+    n_obs=n_observations,
+    initial_epsilon=EPS_START,
+    epsilon_decay=EPS_DECAY,
+    final_epsilon=EPS_END,
     discount_factor=discount,
     buffer_size=buffer_size,
     batch_size=batch_size,
     update_frequency=update_frequency,
     update_target_frequency=update_target_frequency,
-    model_lr=mlp_lr,
+    model_lr=LR,
     seed=seed,
 )
 
-# Environment information
-num_actions = env.action_space.n
-episode_over = False
-
+# Saving settings
 save_dir = Path(f"CartPole_Environment/cartpole_{ALGO_NAME.lower()}/checkpoints")
 save_dir.mkdir(parents=True, exist_ok=True)
 logger = MetricLogger(save_dir)
@@ -77,7 +77,7 @@ pbar = tqdm(
     leave=True,
 )
 while episode_count < MAX_TOTAL_EPISODES:
-    state, _ = env.reset(seed=seed + episode_count)  # (s)
+    state, _ = env.reset()  # (s)
     action = agent.agent_start(state)  # (a)
     episode_reward = 0.0
 
@@ -91,7 +91,7 @@ while episode_count < MAX_TOTAL_EPISODES:
         episode_reward += reward
         total_frames += 1
 
-        if done:
+        if terminated:
             loss, q = agent.agent_end(reward)
         else:
             action, loss, q = agent.agent_step(next_state, reward)
@@ -110,7 +110,7 @@ while episode_count < MAX_TOTAL_EPISODES:
 
     # Record and print moving averages (every 10 episodes is common)
     if episode_count % 10 == 0:
-        logger.record(episode_count, agent.epsilon, total_frames)
+        logger.record(episode_count, agent.eps_threshold, total_frames)
 
 pbar.close()
 env.close()

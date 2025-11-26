@@ -22,9 +22,9 @@ class CNN(nn.Module):
 
 # Small scale Neural Network for testing the DQN and DDQN algorithms
 class MLP(nn.Module):
-    def __init__(self, num_actions):
+    def __init__(self, n_observations, num_actions):
         super().__init__()
-        self.layer1 = nn.Linear(4, 128)
+        self.layer1 = nn.Linear(n_observations, 128)
         self.layer2 = nn.Linear(128, 128)
         self.layer3 = nn.Linear(128, num_actions)
 

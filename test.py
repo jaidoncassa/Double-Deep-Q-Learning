@@ -14,15 +14,17 @@ import torch.nn.functional as F
 env = gym.make("CartPole-v1")
 
 # set up matplotlib
-is_ipython = 'inline' in matplotlib.get_backend()
+is_ipython = "inline" in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
 
 plt.ion()
 
 # if GPU is to be used
 device = torch.device(
-    "cuda" if torch.cuda.is_available() else
-    "mps" if torch.backends.mps.is_available() else
-    "cpu"
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 
 
@@ -43,8 +45,7 @@ device = torch.device(
 # if torch.cuda.is_available():
 #     torch.cuda.manual_seed(seed)
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
 class ReplayMemory(object):
@@ -61,7 +62,7 @@ class ReplayMemory(object):
 
     def __len__(self):
         return len(self.memory)
-    
+
 
 class DQN(nn.Module):
 
@@ -77,7 +78,7 @@ class DQN(nn.Module):
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         return self.layer3(x)
-    
+
 
 # BATCH_SIZE is the number of transitions sampled from the replay buffer
 # GAMMA is the discount factor as mentioned in the previous section
@@ -116,8 +117,9 @@ steps_done = 0
 def select_action(state):
     global steps_done
     sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * steps_done / EPS_DECAY)
+    eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(
+        -1.0 * steps_done / EPS_DECAY
+    )
     steps_done += 1
     if sample > eps_threshold:
         with torch.no_grad():
@@ -126,7 +128,9 @@ def select_action(state):
             # found, so we pick action with the larger expected reward.
             return policy_net(state).max(1).indices.view(1, 1)
     else:
-        return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
+        return torch.tensor(
+            [[env.action_space.sample()]], device=device, dtype=torch.long
+        )
 
 
 episode_durations = []
@@ -136,12 +140,12 @@ def plot_durations(show_result=False):
     plt.figure(1)
     durations_t = torch.tensor(episode_durations, dtype=torch.float)
     if show_result:
-        plt.title('Result')
+        plt.title("Result")
     else:
         plt.clf()
-        plt.title('Training...')
-    plt.xlabel('Episode')
-    plt.ylabel('Duration')
+        plt.title("Training...")
+    plt.xlabel("Episode")
+    plt.ylabel("Duration")
     plt.plot(durations_t.numpy())
     # Take 100 episode averages and plot them too
     if len(durations_t) >= 100:
@@ -169,10 +173,12 @@ def optimize_model():
 
     # Compute a mask of non-final states and concatenate the batch elements
     # (a final state would've been the one after which simulation ended)
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                          batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state
-                                                if s is not None])
+    non_final_mask = torch.tensor(
+        tuple(map(lambda s: s is not None, batch.next_state)),
+        device=device,
+        dtype=torch.bool,
+    )
+    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
@@ -189,7 +195,9 @@ def optimize_model():
     # state value or 0 in case the state was final.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+        next_state_values[non_final_mask] = (
+            target_net(non_final_next_states).max(1).values
+        )
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -205,10 +213,8 @@ def optimize_model():
     optimizer.step()
 
 
-if torch.cuda.is_available() or torch.backends.mps.is_available():
-    num_episodes = 600
-else:
-    num_episodes = 50
+num_episodes = 600
+
 
 for i_episode in range(num_episodes):
     # Initialize the environment and get its state
@@ -223,7 +229,9 @@ for i_episode in range(num_episodes):
         if terminated:
             next_state = None
         else:
-            next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
+            next_state = torch.tensor(
+                observation, dtype=torch.float32, device=device
+            ).unsqueeze(0)
 
         # Store the transition in memory
         memory.push(state, action, next_state, reward)
@@ -239,7 +247,9 @@ for i_episode in range(num_episodes):
         target_net_state_dict = target_net.state_dict()
         policy_net_state_dict = policy_net.state_dict()
         for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+            target_net_state_dict[key] = policy_net_state_dict[
+                key
+            ] * TAU + target_net_state_dict[key] * (1 - TAU)
         target_net.load_state_dict(target_net_state_dict)
 
         if done:
@@ -247,7 +257,7 @@ for i_episode in range(num_episodes):
             plot_durations()
             break
 
-print('Complete')
+print("Complete")
 plot_durations(show_result=True)
 plt.ioff()
 plt.show()

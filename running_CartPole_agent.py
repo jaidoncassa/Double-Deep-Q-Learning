@@ -8,17 +8,21 @@ import torch
 env = gym.make("CartPole-v1", render_mode="human")
 num_actions = env.action_space.n
 
+
 def transform(state):
     t = torch.tensor(state, dtype=torch.float32)
     return t.unsqueeze(0)
 
-# CNN model information
-model = MLP(num_actions=num_actions)
-model.load_state_dict(torch.load("CartPole_Environment/cartpole_DQN_agent.pt"))
-model.eval()
+
 state, info = env.reset()
 done = False
 total_reward = 0.0
+n_obs = len(state)
+
+# CNN model information
+model = MLP(n_obs, num_actions=num_actions)
+model.load_state_dict(torch.load("CartPole_Environment/cartpole_DQN_target_agent.pt"))
+model.eval()
 
 while not done:
 
