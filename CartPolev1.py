@@ -1,18 +1,48 @@
-from Agents import CartPoleDQNAgent, CartPoleDDQNAgent
 from Metrics import MetricLogger
 from tqdm.auto import tqdm
 from pathlib import Path
 import gymnasium as gym
 import numpy as np
 import random
+import Agents
 import torch
 
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
 algorithms = ["DDQN", "DQN"]
-seeds = [42, 123]
-environments = ["CartPole-v1"]
+seeds = [0, 42, 123]
+environments = [
+    # {
+    #     "name" : "CartPole-v1",
+    #     "max_episodes" : 600, 
+    #     "max_steps" : 500,
+    #     "update_target_frequency" : 1,
+    #     "buffer_size" : 10_000,
+    #     "update_frequency" : 1,
+    #     "batch_size" : 128,
+    #     "LR" : 3e-4,
+    #     "discount" : 0.99,
+    #     "EPS_START" : 0.9,
+    #     "EPS_END" : 0.01,
+    #     "EPS_DECAY" : 2_500,
+    #     "agent_class" : [Agents.CartPoleDDQNAgent, Agents.CartPoleDQNAgent]
+    # },
+    {
+        "name" : "MountainCar-v0",
+        "max_episodes" : 2000,
+        "max_steps" : 200,
+        "update_target_frequency" : 5,
+        "buffer_size" : 10_000,
+        "update_frequency" : 1,
+        "batch_size" : 128,
+        "LR" : 3e-4,
+        "discount" : 0.99,
+        "EPS_START" : 0.9,
+        "EPS_END" : 0.01,
+        "EPS_DECAY" : 2_500,
+        "agent_class" : [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent]
+    }]
 
 for game in environments:
     for seed in seeds:
@@ -20,7 +50,7 @@ for game in environments:
 
             print(f"Training with seed: {seed}")
             # Initialize the environment
-            env = gym.make(game)
+            env = gym.make(game["name"])
 
             # Seed everything
             env.observation_space.seed(seed)
@@ -31,39 +61,26 @@ for game in environments:
 
             # Environment settings
             state, _ = env.reset()
-            MAX_TOTAL_EPISODES = 600
             n_observations = len(state)
             num_actions = env.action_space.n
-
-            # Agent settings
-            update_target_frequency = 1
-            max_steps_per_episode = 500
-            buffer_size = 10_000
-            update_frequency = 1
-            batch_size = 128
-            EPS_START = 0.9
-            EPS_END = 0.01
-            EPS_DECAY = 2_500
-            discount = 0.99
-
-            # model parameters
-            LR = 3e-4
+            MAX_TOTAL_EPISODES = game["max_episodes"]
+            max_steps_per_episode = game["max_steps"]
 
             # initalize the agent
-            AgentClass = CartPoleDDQNAgent if ALGO_NAME == "DDQN" else CartPoleDQNAgent
+            AgentClass = game["agent_class"][0] if ALGO_NAME == "DDQN" else game["agent_class"][1]
             agent = AgentClass(
                 env=env,
                 num_actions=num_actions,
                 n_obs=n_observations,
-                initial_epsilon=EPS_START,
-                epsilon_decay=EPS_DECAY,
-                final_epsilon=EPS_END,
-                discount_factor=discount,
-                buffer_size=buffer_size,
-                batch_size=batch_size,
-                update_frequency=update_frequency,
-                update_target_frequency=update_target_frequency,
-                model_lr=LR,
+                initial_epsilon=game["EPS_START"],
+                epsilon_decay=game["EPS_DECAY"],
+                final_epsilon=game["EPS_END"],
+                discount_factor=game["discount"],
+                buffer_size=game["buffer_size"],
+                batch_size=game["batch_size"],
+                update_frequency=game["update_frequency"],
+                update_target_frequency=game["update_target_frequency"],
+                model_lr=game["LR"],
                 seed=seed,
             )
 

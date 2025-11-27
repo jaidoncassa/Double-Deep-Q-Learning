@@ -591,3 +591,77 @@ class CartPoleDDQNAgent(DDQN):
             delayed,
             seed,
         )
+
+
+class MountainCarDQNAgent(DQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = MLP(n_obs, num_actions)
+        delayed = MLP(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
+
+
+class MountainCarDDQNAgent(DDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = MLP(n_obs, num_actions)
+        delayed = MLP(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
