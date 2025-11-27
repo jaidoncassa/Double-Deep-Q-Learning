@@ -15,7 +15,7 @@ seeds = [0, 42, 123]
 environments = [
     # {
     #     "name" : "CartPole-v1",
-    #     "max_episodes" : 600, 
+    #     "max_episodes" : 600,
     #     "max_steps" : 500,
     #     "update_target_frequency" : 1,
     #     "buffer_size" : 10_000,
@@ -29,20 +29,21 @@ environments = [
     #     "agent_class" : [Agents.CartPoleDDQNAgent, Agents.CartPoleDQNAgent]
     # },
     {
-        "name" : "MountainCar-v0",
-        "max_episodes" : 2000,
-        "max_steps" : 200,
-        "update_target_frequency" : 5,
-        "buffer_size" : 10_000,
-        "update_frequency" : 1,
-        "batch_size" : 128,
-        "LR" : 3e-4,
-        "discount" : 0.99,
-        "EPS_START" : 0.9,
-        "EPS_END" : 0.01,
-        "EPS_DECAY" : 2_500,
-        "agent_class" : [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent]
-    }]
+        "name": "MountainCar-v0",
+        "max_episodes": 2000,
+        "max_steps": 200,
+        "update_target_frequency": 1,
+        "buffer_size": 10_000,
+        "update_frequency": 1,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.99,
+        "EPS_START": 0.9,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 50_000,
+        "agent_class": [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent],
+    }
+]
 
 for game in environments:
     for seed in seeds:
@@ -67,7 +68,11 @@ for game in environments:
             max_steps_per_episode = game["max_steps"]
 
             # initalize the agent
-            AgentClass = game["agent_class"][0] if ALGO_NAME == "DDQN" else game["agent_class"][1]
+            AgentClass = (
+                game["agent_class"][0]
+                if ALGO_NAME == "DDQN"
+                else game["agent_class"][1]
+            )
             agent = AgentClass(
                 env=env,
                 num_actions=num_actions,
@@ -85,7 +90,9 @@ for game in environments:
             )
 
             # Saving settings
-            save_dir = Path(f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/")
+            save_dir = Path(
+                f"{game["name"]}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/"
+            )
             save_dir.mkdir(parents=True, exist_ok=True)
             logger = MetricLogger(save_dir)
 
@@ -140,9 +147,9 @@ for game in environments:
             env.close()
             torch.save(
                 agent.main_net.state_dict(),
-                f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_agent.pt",
+                f"{game["name"]}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_agent.pt",
             )
             torch.save(
                 agent.delayed_net.state_dict(),
-                f"{game}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_target_agent.pt",
+                f"{game["name"]}_Environment/{ALGO_NAME.lower()}/{seed}_checkpoints/{ALGO_NAME.lower()}_{seed}_target_agent.pt",
             )

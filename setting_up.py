@@ -29,7 +29,7 @@ for ALGO_NAME in algorithms:
 
     # Environment settings
     state, _ = env.reset()
-    MAX_TOTAL_EPISODES = 200
+    MAX_TOTAL_EPISODES = 3000
     n_observations = len(state)
     num_actions = env.action_space.n
 
@@ -48,7 +48,11 @@ for ALGO_NAME in algorithms:
     LR = 3e-4
 
     # initalize the agent
-    AgentClass = Agents.MountainCarDDQNAgent if ALGO_NAME == "DDQN" else Agents.MountainCarDQNAgent
+    AgentClass = (
+        Agents.MountainCarDDQNAgent
+        if ALGO_NAME == "DDQN"
+        else Agents.MountainCarDQNAgent
+    )
     agent = AgentClass(
         env=env,
         num_actions=num_actions,
@@ -119,5 +123,9 @@ for ALGO_NAME in algorithms:
     logger.save_plots()
     pbar.close()
     env.close()
-    torch.save(agent.main_net.state_dict(), f"MountainCar-v0_checkpoints/policy_agent.pt")
-    torch.save(agent.delayed_net.state_dict(), "MountainCar-v0_checkpoints/target_agent.pt")
+    torch.save(
+        agent.main_net.state_dict(), f"MountainCar-v0_checkpoints/policy_agent.pt"
+    )
+    torch.save(
+        agent.delayed_net.state_dict(), "MountainCar-v0_checkpoints/target_agent.pt"
+    )

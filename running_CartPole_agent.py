@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-env = gym.make("CartPole-v1", render_mode="human")
+env = gym.make("MountainCar-v0", render_mode="human")
 num_actions = env.action_space.n
 
 
@@ -21,7 +21,7 @@ n_obs = len(state)
 
 # CNN model information
 model = MLP(n_obs, num_actions=num_actions)
-model.load_state_dict(torch.load("CartPole_Environment/cartpole_DQN_target_agent.pt"))
+model.load_state_dict(torch.load("MountainCar-v0_checkpoints/target_agent.pt"))
 model.eval()
 
 while not done:
