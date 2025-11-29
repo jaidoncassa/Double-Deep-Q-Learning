@@ -21,7 +21,9 @@ n_obs = len(state)
 
 # CNN model information
 model = MLP(n_obs, num_actions=num_actions)
-model.load_state_dict(torch.load("MountainCar-v0_checkpoints/target_agent.pt"))
+model.load_state_dict(
+    torch.load("MountainCar-v0_Environment/ddqn/123_checkpoints/ddqn_123_agent.pt")
+)
 model.eval()
 
 while not done:

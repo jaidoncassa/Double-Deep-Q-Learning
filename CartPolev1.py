@@ -10,8 +10,8 @@ import torch
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-algorithms = ["DDQN", "DQN"]
-seeds = [0, 42, 123]
+algorithms = ["DQN"]
+seeds = [42, 123]
 environments = [
     # {
     #     "name" : "CartPole-v1",
@@ -37,10 +37,10 @@ environments = [
         "update_frequency": 1,
         "batch_size": 128,
         "LR": 3e-4,
-        "discount": 0.99,
+        "discount": 0.95,
         "EPS_START": 0.9,
         "EPS_END": 0.01,
-        "EPS_DECAY": 50_000,
+        "EPS_DECAY": 20_000,
         "agent_class": [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent],
     }
 ]
