@@ -23,6 +23,7 @@ environments = [
         "batch_size": 128,
         "LR": 3e-4,
         "discount": 0.99,
+        "n_step_buffer_size": 3,
         "EPS_START": 0.9,
         "EPS_END": 0.01,
         "EPS_DECAY": 2_500,
@@ -42,6 +43,7 @@ environments = [
         "batch_size": 128,
         "LR": 3e-4,
         "discount": 0.95,
+        "n_step_buffer_size": 5,
         "EPS_START": 0.9,
         "EPS_END": 0.01,
         "EPS_DECAY": 20_000,
@@ -61,6 +63,7 @@ environments = [
         "batch_size": 128,
         "LR": 3e-4,
         "discount": 0.99,
+        "n_step_buffer_size": 5,
         "EPS_START": 0.9,
         "EPS_END": 0.01,
         "EPS_DECAY": 20_000,
@@ -116,6 +119,9 @@ for game in environments:
                 update_target_frequency=game["update_target_frequency"],
                 model_lr=game["LR"],
                 seed=seed,
+                nstep_buffer_size=(
+                    game["n_step_buffer_size"] if ALGO_NAME == "nStepDDQN" else None
+                ),
             )
 
             # Saving settings

@@ -340,6 +340,7 @@ class DDQN(DQN):
         main_net,
         delayed_net,
         seed: int,
+        nstep_buffer_size=None,
     ):
         super().__init__(
             env,
@@ -455,7 +456,6 @@ class nStepDDQN(DDQN):
         final_epsilon: float,
         discount_factor: float,
         buffer_size: int,
-        nstep_buffer_size: int,
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
@@ -463,6 +463,7 @@ class nStepDDQN(DDQN):
         main_net,
         delayed_net,
         seed: int,
+        nstep_buffer_size: int,
     ):
         # Maintain two buffers now, think of the nstep_buffer as a sliding window
         self.nstep_buffer = deque(maxlen=nstep_buffer_size)
@@ -529,6 +530,7 @@ class MsPacmanDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = CNN(num_actions)
         delayed = CNN(num_actions)
@@ -570,6 +572,7 @@ class MsPacmanDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = CNN(n_obs, num_actions)
         delayed = CNN(n_obs, num_actions)
@@ -606,12 +609,12 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         final_epsilon: float,
         discount_factor: float,
         buffer_size: int,
-        nstep_buffer_size: int,
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size: int,
     ):
         main = CNN(n_obs, num_actions)
         delayed = CNN(n_obs, num_actions)
@@ -623,7 +626,6 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
             final_epsilon,
             discount_factor,
             buffer_size,
-            nstep_buffer_size,
             batch_size,
             update_frequency,
             update_target_frequency,
@@ -631,6 +633,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            nstep_buffer_size,
         )
 
     def transform(self, img):
@@ -657,6 +660,7 @@ class CartPoleDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -694,6 +698,7 @@ class CartPoleDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -726,12 +731,12 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
         final_epsilon: float,
         discount_factor: float,
         buffer_size: int,
-        nstep_buffer_size: int,
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -743,7 +748,6 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
             final_epsilon,
             discount_factor,
             buffer_size,
-            nstep_buffer_size,
             batch_size,
             update_frequency,
             update_target_frequency,
@@ -751,6 +755,7 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            nstep_buffer_size,
         )
 
 
@@ -773,6 +778,7 @@ class MountainCarDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -810,6 +816,7 @@ class MountainCarDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -842,12 +849,12 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
         final_epsilon: float,
         discount_factor: float,
         buffer_size: int,
-        nstep_buffer_size: int,
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -859,7 +866,6 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             final_epsilon,
             discount_factor,
             buffer_size,
-            nstep_buffer_size,
             batch_size,
             update_frequency,
             update_target_frequency,
@@ -867,6 +873,7 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            nstep_buffer_size,
         )
 
 
@@ -889,6 +896,7 @@ class AcrobotDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -926,6 +934,7 @@ class AcrobotDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -958,12 +967,12 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
         final_epsilon: float,
         discount_factor: float,
         buffer_size: int,
-        nstep_buffer_size: int,
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
         delayed = MLP(n_obs, num_actions)
@@ -975,7 +984,6 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
             final_epsilon,
             discount_factor,
             buffer_size,
-            nstep_buffer_size,
             batch_size,
             update_frequency,
             update_target_frequency,
@@ -983,4 +991,5 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            nstep_buffer_size,
         )
