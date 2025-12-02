@@ -10,8 +10,8 @@ import torch
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-algorithms = ["DQN"]
-seeds = [42, 123]
+algorithms = ["DDQN", "DQN"]
+seeds = [0, 42, 123]
 environments = [
     # {
     #     "name" : "CartPole-v1",
@@ -28,21 +28,37 @@ environments = [
     #     "EPS_DECAY" : 2_500,
     #     "agent_class" : [Agents.CartPoleDDQNAgent, Agents.CartPoleDQNAgent]
     # },
+    # {
+    #     "name": "MountainCar-v0",
+    #     "max_episodes": 2000,
+    #     "max_steps": 200,
+    #     "update_target_frequency": 1,
+    #     "buffer_size": 10_000,
+    #     "update_frequency": 1,
+    #     "batch_size": 128,
+    #     "LR": 3e-4,
+    #     "discount": 0.95,
+    #     "EPS_START": 0.9,
+    #     "EPS_END": 0.01,
+    #     "EPS_DECAY": 20_000,
+    #     "agent_class": [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent],
+    # },
     {
-        "name": "MountainCar-v0",
+        "name": "Acrobot-v1",
         "max_episodes": 2000,
-        "max_steps": 200,
+        "max_steps": 500,
         "update_target_frequency": 1,
         "buffer_size": 10_000,
         "update_frequency": 1,
         "batch_size": 128,
         "LR": 3e-4,
-        "discount": 0.95,
+        "discount": 0.99,
         "EPS_START": 0.9,
         "EPS_END": 0.01,
         "EPS_DECAY": 20_000,
-        "agent_class": [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent],
+        "agent_class": [Agents.AcrobotDDQNAgent, Agents.AcrobotDQNAgent],
     }
+
 ]
 
 for game in environments:
