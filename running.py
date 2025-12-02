@@ -5,7 +5,7 @@ import gymnasium as gym
 import torch
 
 # Initialize the environment
-env = gym.make('Acrobot-v1', render_mode="rgb_array")
+env = gym.make("Acrobot-v1", render_mode="human")
 
 # Environment settings
 state, _ = env.reset()

@@ -10,6 +10,9 @@ import torch
 import math
 
 
+#####################################################################
+# Main superclasses
+#####################################################################
 class DQN:
     def __init__(
         self,
@@ -240,7 +243,7 @@ class DQN:
         """
         # Save the full observation (s, a, R, s')
         obs = (self.prev_state, self.prev_action, reward, state, False)
-        self.replay_buffer.append(obs)
+        self.push_transition(obs)
 
         # Turn into Torcher vector
         input = self.transform(state)
@@ -281,7 +284,7 @@ class DQN:
         """
         # Save the full observation (s, a, R, s')
         obs = (self.prev_state, self.prev_action, reward, None, True)
-        self.replay_buffer.append(obs)
+        self.push_transition(obs)
 
         # Update the weights of the Neural Network every n steps past batch_size steps
         q = None
@@ -302,6 +305,10 @@ class DQN:
         self.prev_state = None
         self.prev_action = None
         return loss, q
+
+    def push_transition(self, transition):
+        # Save the full observation (s, a, R, s', done)
+        self.replay_buffer.append(transition)
 
     def transform(self, state):
         return torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -438,6 +445,75 @@ class DDQN(DQN):
         return loss.item(), avg_q_value
 
 
+class nStepDDQN(DDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        nstep_buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        main_net,
+        delayed_net,
+        seed: int,
+    ):
+        # Maintain two buffers now, think of the nstep_buffer as a sliding window
+        self.nstep_buffer = deque(maxlen=nstep_buffer_size)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main_net,
+            delayed_net,
+            seed,
+        )
+
+    def push_transition(self, transition):
+        # Add raw transition to local n-step buffer
+        self.nstep_buffer.append(transition)
+
+        # If not enough transitions yet, do nothing
+        if len(self.nstep_buffer) < self.nstep_buffer.maxlen:
+            return
+
+        # Otherwise, compute n-step transition
+        # Extract components from n-step buffer (a sliding window)
+        s0, a0, _, _, _ = self.nstep_buffer[0]
+
+        # Collect all rewards
+        rewards = [tr[2] for tr in self.nstep_buffer]
+
+        # Compute discounted n-step reward
+        G = sum([rewards[i] * (self.discount_factor**i) for i in range(len(rewards))])
+
+        # Final state + done flag come from the last transition in the buffer
+        _, _, _, s_n, done_n = self.nstep_buffer[-1]
+
+        # Create compressed n-step transition
+        nstep_transition = (s0, a0, G, s_n, done_n)
+
+        # Add to large replay buffer
+        self.replay_buffer.append(nstep_transition)
+
+
+#####################################################################
+# MsPacman subclasses
+#####################################################################
 class MsPacmanDQNAgent(DQN):
     def __init__(
         self,
@@ -478,7 +554,7 @@ class MsPacmanDQNAgent(DQN):
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
 
-class McPacmanDDQNAgent(DDQN):
+class MsPacmanDDQNAgent(DDQN):
     def __init__(
         self,
         env: gym.Env,
@@ -519,6 +595,52 @@ class McPacmanDDQNAgent(DDQN):
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
 
+class MsPacmanNStepDDQNAgent(nStepDDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        nstep_buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = CNN(n_obs, num_actions)
+        delayed = CNN(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            nstep_buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
+
+    def transform(self, img):
+        # Must normalize and turn into a tensor object
+        return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+
+
+#####################################################################
+# CartPole subclasses
+#####################################################################
 class CartPoleDQNAgent(DQN):
     def __init__(
         self,
@@ -593,6 +715,48 @@ class CartPoleDDQNAgent(DDQN):
         )
 
 
+class CartPoleNStepDDQNAgent(nStepDDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        nstep_buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = MLP(n_obs, num_actions)
+        delayed = MLP(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            nstep_buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
+
+
+#####################################################################
+# MountainCar subclasses
+#####################################################################
 class MountainCarDQNAgent(DQN):
     def __init__(
         self,
@@ -667,6 +831,48 @@ class MountainCarDDQNAgent(DDQN):
         )
 
 
+class MountainCarNStepDDQNAgent(nStepDDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        nstep_buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = MLP(n_obs, num_actions)
+        delayed = MLP(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            nstep_buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
+
+
+#####################################################################
+# Acrobot subclasses
+#####################################################################
 class AcrobotDQNAgent(DQN):
     def __init__(
         self,
@@ -731,6 +937,45 @@ class AcrobotDDQNAgent(DDQN):
             final_epsilon,
             discount_factor,
             buffer_size,
+            batch_size,
+            update_frequency,
+            update_target_frequency,
+            model_lr,
+            main,
+            delayed,
+            seed,
+        )
+
+
+class AcrobotNStepDDQNAgent(nStepDDQN):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_actions: int,
+        n_obs: int,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float,
+        buffer_size: int,
+        nstep_buffer_size: int,
+        batch_size: int,
+        update_frequency: int,
+        update_target_frequency: int,
+        model_lr: float,
+        seed: int,
+    ):
+        main = MLP(n_obs, num_actions)
+        delayed = MLP(n_obs, num_actions)
+        super().__init__(
+            env,
+            num_actions,
+            initial_epsilon,
+            epsilon_decay,
+            final_epsilon,
+            discount_factor,
+            buffer_size,
+            nstep_buffer_size,
             batch_size,
             update_frequency,
             update_target_frequency,

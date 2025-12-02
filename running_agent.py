@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-env = gym.make("MountainCar-v0", render_mode="human")
+env = gym.make("Acrobot-v1", render_mode="human")
 num_actions = env.action_space.n
 
 
@@ -18,10 +18,12 @@ done = False
 total_reward = 0.0
 n_obs = len(state)
 
+# print(state)
+
 # CNN model information
 model = MLP(n_obs, num_actions=num_actions)
 model.load_state_dict(
-    torch.load("MountainCar-v0_Environment/ddqn/123_checkpoints/ddqn_123_agent.pt")
+    torch.load("Acrobot-v1_Environment/ddqn/42_checkpoints/ddqn_42_agent.pt")
 )
 model.eval()
 

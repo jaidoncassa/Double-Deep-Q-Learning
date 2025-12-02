@@ -10,43 +10,51 @@ import torch
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-algorithms = ["DDQN", "DQN"]
+algorithms = ["nStepDDQN"]
 seeds = [0, 42, 123]
 environments = [
-    # {
-    #     "name" : "CartPole-v1",
-    #     "max_episodes" : 600,
-    #     "max_steps" : 500,
-    #     "update_target_frequency" : 1,
-    #     "buffer_size" : 10_000,
-    #     "update_frequency" : 1,
-    #     "batch_size" : 128,
-    #     "LR" : 3e-4,
-    #     "discount" : 0.99,
-    #     "EPS_START" : 0.9,
-    #     "EPS_END" : 0.01,
-    #     "EPS_DECAY" : 2_500,
-    #     "agent_class" : [Agents.CartPoleDDQNAgent, Agents.CartPoleDQNAgent]
-    # },
-    # {
-    #     "name": "MountainCar-v0",
-    #     "max_episodes": 2000,
-    #     "max_steps": 200,
-    #     "update_target_frequency": 1,
-    #     "buffer_size": 10_000,
-    #     "update_frequency": 1,
-    #     "batch_size": 128,
-    #     "LR": 3e-4,
-    #     "discount": 0.95,
-    #     "EPS_START": 0.9,
-    #     "EPS_END": 0.01,
-    #     "EPS_DECAY": 20_000,
-    #     "agent_class": [Agents.MountainCarDDQNAgent, Agents.MountainCarDQNAgent],
-    # },
+    {
+        "name": "CartPole-v1",
+        "max_episodes": 600,
+        "max_steps": 500,
+        "update_target_frequency": 1,
+        "buffer_size": 10_000,
+        "update_frequency": 1,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.99,
+        "EPS_START": 0.9,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 2_500,
+        "agent_class": [
+            Agents.CartPoleDQNAgent,
+            Agents.CartPoleDDQNAgent,
+            Agents.CartPoleNStepDDQNAgent,
+        ],
+    },
+    {
+        "name": "MountainCar-v0",
+        "max_episodes": 2000,
+        "max_steps": 200,
+        "update_target_frequency": 1,
+        "buffer_size": 10_000,
+        "update_frequency": 1,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.95,
+        "EPS_START": 0.9,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 20_000,
+        "agent_class": [
+            Agents.MountainCarDQNAgent,
+            Agents.MountainCarDDQNAgent,
+            Agents.MountainCarNStepDDQNAgent,
+        ],
+    },
     {
         "name": "Acrobot-v1",
         "max_episodes": 2000,
-        "max_steps": 500
+        "max_steps": 500,
         "update_target_frequency": 1,
         "buffer_size": 10_000,
         "update_frequency": 1,
@@ -56,9 +64,12 @@ environments = [
         "EPS_START": 0.9,
         "EPS_END": 0.01,
         "EPS_DECAY": 20_000,
-        "agent_class": [Agents.AcrobotDDQNAgent, Agents.AcrobotDQNAgent],
-    }
-
+        "agent_class": [
+            Agents.AcrobotDQNAgent,
+            Agents.AcrobotDDQNAgent,
+            Agents.AcrobotNStepDDQNAgent,
+        ],
+    },
 ]
 
 for game in environments:
@@ -83,12 +94,14 @@ for game in environments:
             MAX_TOTAL_EPISODES = game["max_episodes"]
             max_steps_per_episode = game["max_steps"]
 
-            # initalize the agent
-            AgentClass = (
-                game["agent_class"][0]
-                if ALGO_NAME == "DDQN"
-                else game["agent_class"][1]
-            )
+            # Initalize the agent to DQN
+            AgentClass = game["agent_class"][0]
+            if ALGO_NAME == "DDQN":
+                AgentClass = game["agent_class"][1]
+            elif ALGO_NAME == "nStepDDQN":
+                AgentClass = game["agent_class"][2]
+
+            # Create agent
             agent = AgentClass(
                 env=env,
                 num_actions=num_actions,
