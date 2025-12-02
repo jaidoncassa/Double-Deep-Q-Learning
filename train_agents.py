@@ -46,7 +46,7 @@ environments = [
     {
         "name": "Acrobot-v1",
         "max_episodes": 2000,
-        "max_steps": 500,
+        "max_steps": 500
         "update_target_frequency": 1,
         "buffer_size": 10_000,
         "update_frequency": 1,
