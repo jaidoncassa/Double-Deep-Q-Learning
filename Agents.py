@@ -396,12 +396,12 @@ class DDQN(DQN):
                 0, state_batch.shape[1], device=self.device
             )
 
-        # 4. Compute Q(s_t, a) from the main network (State Action Values)
+        # Compute Q(s_t, a) from the main network (State Action Values)
         state_action_values = self.main_net(state_batch).gather(1, action_batch)
 
-        # --- DDQN Q-Value Calculation ---
+        # DDQN Q-Value Calculation
 
-        # 5. Compute the Target V(s_{t+1}) for all next states
+        # Compute the Target V(s_{t+1}) for all next states
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             if non_final_next_states.numel() > 0:
@@ -421,20 +421,21 @@ class DDQN(DQN):
                     .squeeze(1)
                 )
 
-        # 6. Compute Expected Q Values (Bellman Target)
+        # Compute Expected Q Values (Bellman Target) R + γQ(s_t+1, argmaxQ(s_t+1, a'; 𝜃); 𝜃_-1)
+        # Must t
         expected_state_action_values = (
             next_state_values * self.discount_factor
         ) + reward_batch
 
-        # 7. Compute Loss
+        # Compute Loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-        # 8. Optimize the model
+        # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
 
-        # *** ADDED: GRADIENT CLIPPING FOR STABILITY ***
+        # ADDED: GRADIENT CLIPPING FOR STABILITY ***
         torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
 
         self.optimizer.step()
@@ -467,6 +468,7 @@ class nStepDDQN(DDQN):
     ):
         # Maintain two buffers now, think of the nstep_buffer as a sliding window
         self.nstep_buffer = deque(maxlen=nstep_buffer_size)
+        self.n = nstep_buffer_size
         super().__init__(
             env,
             num_actions,
@@ -484,32 +486,128 @@ class nStepDDQN(DDQN):
             seed,
         )
 
+    def update_cnn_weights(self):
+        # Should never happen because we have a check already, but lets be safe
+        if len(self.replay_buffer) < self.batch_size:
+            return 0, 0
+
+        # Randomly sample from reply buffer of the form (theta(s), a, G_sum, theta(s'_t+n+1))
+        samples = random.sample(self.replay_buffer, k=self.batch_size)
+        batch = self.Transition(*zip(*samples))
+
+        # Process States, Actions, and Rewards
+        # Identify non-final next states for mask
+        non_final_next_states_np = [s for s in batch.next_state if s is not None]
+
+        non_final_mask = torch.tensor(
+            [s is not None for s in batch.next_state],
+            device=self.device,
+            dtype=torch.bool,
+        )
+
+        # Transform and concatenate all batch elements
+        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        action_batch = torch.tensor(
+            batch.action, dtype=torch.long, device=self.device
+        ).unsqueeze(1)
+        reward_batch = torch.tensor(
+            batch.reward, dtype=torch.float32, device=self.device
+        )
+
+        # Transform and concatenate non-final next states
+        if non_final_next_states_np:
+            non_final_next_states = torch.cat(
+                [self.transform(s) for s in non_final_next_states_np]
+            )
+        else:
+            non_final_next_states = torch.empty(
+                0, state_batch.shape[1], device=self.device
+            )
+
+        # Compute Q(s_t, a) from the main network (State Action Values)
+        q_sa = self.main_net(state_batch).gather(1, action_batch)
+
+        # DDQN Q-Value Calculation
+
+        # Compute the Target V(s_{t+1}) for all next states
+        next_state_values = torch.zeros(self.batch_size, device=self.device)
+        with torch.no_grad():
+            if non_final_next_states.numel() > 0:
+                # DDQN Logic: Use main_net to SELECT action, target_net to EVALUATE
+                # Selection: argmax_a Q(s', a; main)
+                # Find the action indices that maximize Q in the MAIN network
+                best_actions = (
+                    self.main_net(non_final_next_states).argmax(1).unsqueeze(1)
+                )
+
+                # Evaluation: Q(s', best_action; target)
+                # Use those indices to look up the Q-value from the TARGET network
+                next_state_values[non_final_mask] = (
+                    self.delayed_net(non_final_next_states)
+                    .gather(1, best_actions)
+                    .squeeze(1)
+                )
+
+        # Calculate gamma^n
+        gamma_n = self.discount_factor**self.n
+
+        # Compute Expected Q Values (Bellman Target) G_sum + (γ**n)Q(s_t+n+1, argmaxQ(s_t+n+1, a'; 𝜃); 𝜃_-1)
+        # We must rememeber for nstep bootstrapping, we must weight the Q function of our target network
+        # by γ**n, not just weighting by γ.
+        targets = reward_batch + gamma_n * next_state_values
+
+        # For terminal states: remove bootstrapping
+        targets[~non_final_mask] = reward_batch[~non_final_mask]
+
+        # Compute Loss
+        criterion = nn.SmoothL1Loss()
+        loss = criterion(q_sa, targets.unsqueeze(1))
+
+        # Optimize the model
+        self.optimizer.zero_grad()
+        loss.backward()
+
+        # ADDED: GRADIENT CLIPPING FOR STABILITY ***
+        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
+
+        self.optimizer.step()
+
+        # Average Q(s, a) value
+        avg_q_value = torch.mean(q_sa).item()
+
+        # Return the loss and the average Q-value for logging
+        return loss.item(), avg_q_value
+
     def push_transition(self, transition):
-        # Add raw transition to local n-step buffer
         self.nstep_buffer.append(transition)
 
-        # If not enough transitions yet, do nothing
-        if len(self.nstep_buffer) < self.nstep_buffer.maxlen:
+        # If terminal, flush shorter ones
+        if transition[-1]:
+            self.flush_nstep_buffer()
             return
 
-        # Otherwise, compute n-step transition
-        # Extract components from n-step buffer (a sliding window)
-        s0, a0, _, _, _ = self.nstep_buffer[0]
+        if len(self.nstep_buffer) == self.nstep_buffer.maxlen:
+            # Create full n-step transition
+            self.create_and_store_nstep()
 
-        # Collect all rewards
+    def create_and_store_nstep(self):
+        # window length (may be < n during flush)
+        k = len(self.nstep_buffer)
+
+        s0, a0 = self.nstep_buffer[0][0], self.nstep_buffer[0][1]
+
         rewards = [tr[2] for tr in self.nstep_buffer]
+        G = sum([self.discount_factor**i * rewards[i] for i in range(k)])
 
-        # Compute discounted n-step reward
-        G = sum([rewards[i] * (self.discount_factor**i) for i in range(len(rewards))])
+        _, _, _, s_k, done_k = self.nstep_buffer[-1]
 
-        # Final state + done flag come from the last transition in the buffer
-        _, _, _, s_n, done_n = self.nstep_buffer[-1]
+        # store (s0, a0, G, s_k, done)
+        self.replay_buffer.append((s0, a0, G, s_k, done_k))
 
-        # Create compressed n-step transition
-        nstep_transition = (s0, a0, G, s_n, done_n)
-
-        # Add to large replay buffer
-        self.replay_buffer.append(nstep_transition)
+    def flush_nstep_buffer(self):
+        while len(self.nstep_buffer) > 0:
+            self.create_and_store_nstep()
+            self.nstep_buffer.popleft()
 
 
 #####################################################################

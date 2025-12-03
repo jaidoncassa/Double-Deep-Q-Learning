@@ -14,9 +14,7 @@ class MetricLogger:
                 f"{'TimeDelta':>15}{'Time':>20}\n"
             )
         with open(self.save_step_log, "w") as f:
-            f.write(
-                f"{'Reward':>15}{'Loss':>15}{'Length':>15}\n"
-            )
+            f.write(f"{'Reward':>15}{'Loss':>15}{'Length':>15}\n")
 
         self.ep_rewards_plot = save_dir / "reward_plot.jpg"
         self.ep_lengths_plot = save_dir / "length_plot.jpg"
@@ -83,12 +81,12 @@ class MetricLogger:
         #     "ep_rewards_step": self.ep_rewards_step_plot,
         #     "ep_losses_step": self.ep_losses_step_plot,
         # }
-        
+
         # for metric_name, file_path in plot_metrics.items():
         #     plt.clf()
         #     plt.plot(
         #         # Correct access: use metric_name (e.g., "ep_rewards_step")
-        #         getattr(self, metric_name), 
+        #         getattr(self, metric_name),
         #         label=metric_name.replace("ep_", "raw_")
         #     )
         #     plt.legend()
@@ -146,8 +144,8 @@ class MetricLogger:
             plt.clf()
             plt.plot(
                 # Correct access: use metric_name (e.g., "ep_rewards")
-                getattr(self, f"moving_avg_{metric_name}"), 
-                label=f"moving_avg_{metric_name}"
+                getattr(self, f"moving_avg_{metric_name}"),
+                label=f"moving_avg_{metric_name}",
             )
             plt.legend()
             # Correct saving: use the pre-defined file path
@@ -157,13 +155,13 @@ class MetricLogger:
             "ep_rewards_step": self.ep_rewards_step_plot,
             "ep_losses_step": self.ep_losses_step_plot,
         }
-        
+
         for metric_name, file_path in plot_metrics.items():
             plt.clf()
             plt.plot(
                 # Correct access: use metric_name (e.g., "ep_rewards_step")
-                getattr(self, metric_name), 
-                label=metric_name.replace("ep_", "raw_")
+                getattr(self, metric_name),
+                label=metric_name.replace("ep_", "raw_"),
             )
             plt.legend()
             # Correct saving: use the pre-defined file path
