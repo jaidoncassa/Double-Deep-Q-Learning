@@ -30,6 +30,7 @@ class DQN:
         main_net,
         delayed_net,
         seed: int,
+        max_clip: int,
     ):
         """Intialize a DQN learning agent
 
@@ -72,6 +73,7 @@ class DQN:
         self.final_epsilon = final_epsilon
         self.eps_threshold = 0
         self.set_epsilon()
+        self.max_clip = max_clip
 
         # NN properties
         self.optimizer = self.optimizer = optim.AdamW(
@@ -96,7 +98,7 @@ class DQN:
         samples = random.sample(self.replay_buffer, k=self.batch_size)
         batch = self.Transition(*zip(*samples))
 
-        # 3. Process States, Actions, and Rewards
+        # Process States, Actions, and Rewards
         # The states were saved as NumPy arrays, so we need to transform and cat them.
         # We also need to filter out None next_states (terminal states)
 
@@ -127,14 +129,14 @@ class DQN:
                 0, state_batch.shape[1], device=self.device
             )  # Handle empty case
 
-        # --- Q-Value Calculation ---
+        # Q-Value Calculation
 
-        # 4. Compute Q(s_t, a) from the main network (State Action Values)
+        # Compute Q(s_t, a) from the main network (State Action Values)
         # policy_net(state_batch) gives Q(s_t) for all actions. gather(1, action_batch) selects the Q-value for the action taken.
         state_action_values = self.main_net(state_batch)
         state_action_values = state_action_values.gather(1, action_batch)
 
-        # 5. Compute the Target V(s_{t+1}) for all next states
+        # Compute the Target V(s_{t+1}) for all next states
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             if non_final_next_states.numel() > 0:
@@ -143,22 +145,24 @@ class DQN:
                     self.delayed_net(non_final_next_states).max(1).values
                 )
 
-        # 6. Compute Expected Q Values (Bellman Target)
+        # Compute Expected Q Values (Bellman Target)
         # Expected Q = R + gamma * V(s_{t+1})
         expected_state_action_values = (
             next_state_values * self.discount_factor
         ) + reward_batch
 
-        # 7. Compute Loss
+        # Compute Loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-        # 8. Optimize the model
+        # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
 
-        # *** ADDED: GRADIENT CLIPPING FOR STABILITY ***
-        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
+        # ADDED: GRADIENT CLIPPING FOR STABILITY
+        torch.nn.utils.clip_grad_norm_(
+            self.main_net.parameters(), max_norm=self.max_clip
+        )
 
         self.optimizer.step()
 
@@ -340,6 +344,7 @@ class DDQN(DQN):
         main_net,
         delayed_net,
         seed: int,
+        max_norm: int,
         nstep_buffer_size=None,
     ):
         super().__init__(
@@ -357,6 +362,7 @@ class DDQN(DQN):
             main_net,
             delayed_net,
             seed,
+            max_norm,
         )
 
     def update_cnn_weights(self):
@@ -436,7 +442,9 @@ class DDQN(DQN):
         loss.backward()
 
         # ADDED: GRADIENT CLIPPING FOR STABILITY ***
-        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
+        torch.nn.utils.clip_grad_norm_(
+            self.main_net.parameters(), max_norm=self.max_clip
+        )
 
         self.optimizer.step()
 
@@ -464,6 +472,7 @@ class nStepDDQN(DDQN):
         main_net,
         delayed_net,
         seed: int,
+        max_clip: int,
         nstep_buffer_size: int,
     ):
         # Maintain two buffers now, think of the nstep_buffer as a sliding window
@@ -484,6 +493,7 @@ class nStepDDQN(DDQN):
             main_net,
             delayed_net,
             seed,
+            max_clip,
         )
 
     def update_cnn_weights(self):
@@ -568,7 +578,9 @@ class nStepDDQN(DDQN):
         loss.backward()
 
         # ADDED: GRADIENT CLIPPING FOR STABILITY ***
-        torch.nn.utils.clip_grad_norm_(self.main_net.parameters(), max_norm=100)
+        torch.nn.utils.clip_grad_norm_(
+            self.main_net.parameters(), max_norm=self.max_clip
+        )
 
         self.optimizer.step()
 
@@ -628,6 +640,7 @@ class MsPacmanDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = CNN(num_actions)
@@ -647,6 +660,7 @@ class MsPacmanDQNAgent(DQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
     def transform(self, img):
@@ -670,10 +684,11 @@ class MsPacmanDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
-        main = CNN(n_obs, num_actions)
-        delayed = CNN(n_obs, num_actions)
+        main = CNN(num_actions)
+        delayed = CNN(num_actions)
         super().__init__(
             env,
             num_actions,
@@ -689,6 +704,7 @@ class MsPacmanDDQNAgent(DDQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
     def transform(self, img):
@@ -712,10 +728,11 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size: int,
     ):
-        main = CNN(n_obs, num_actions)
-        delayed = CNN(n_obs, num_actions)
+        main = CNN(num_actions)
+        delayed = CNN(num_actions)
         super().__init__(
             env,
             num_actions,
@@ -731,12 +748,115 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            max_clip,
             nstep_buffer_size,
         )
 
     def transform(self, img):
         # Must normalize and turn into a tensor object
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+
+    def reset_target_network(self):
+        "Overwrite this method with hard-updates and soft-updates"
+        target_net_state_dict = self.delayed_net.state_dict()
+        policy_net_state_dict = self.main_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]
+        self.delayed_net.load_state_dict(target_net_state_dict)
+        return
+
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
+        )
+
+    def agent_step(self, state, reward):
+        """A step taken by the agent.
+
+
+        Args:
+            reward (float): The reward recieved for taking the last action that was taken
+            state: The new state returned to us from the environment after we made t-1 step.
+
+
+        Returns:
+            The action the agent is taking
+        """
+        # Save the full observation (s, a, R, s')
+        obs = (self.prev_state, self.prev_action, reward, state, False)
+        self.push_transition(obs)
+
+        # Turn into Torcher vector
+        input = self.transform(state)
+        with torch.no_grad():
+            # Predict the Q(s, a) values!
+            q_values = self.main_net(input)
+
+        # Get the action and return it to the main controller
+        action = self.get_action(q_values)
+
+        # Update the weights of the Neural Network every n steps past 32 steps
+        q = None
+        loss = None
+
+        # Added a new warmup mechanism
+        if (
+            self.frame_count > 50_000
+            and self.frame_count % self.update_frequency == 0
+            and len(self.replay_buffer) > self.batch_size
+        ):
+            loss, q = self.update_cnn_weights()
+
+        # Reset the delayed network every m steps
+        if (
+            self.frame_count > 50_000
+            and self.frame_count > 0
+            and self.frame_count % self.update_target_frequency == 0
+        ):
+            self.reset_target_network()
+
+        # Update trackers
+        self.prev_state = state  # s
+        self.prev_action = action  # a'
+
+        return action, loss, q
+
+    def agent_end(self, reward):
+        """Run when the agent terminates
+
+        Args:
+            reward: the reward the agent recieved for entering the terminal state.
+        """
+        # Save the full observation (s, a, R, s')
+        obs = (self.prev_state, self.prev_action, reward, None, True)
+        self.push_transition(obs)
+
+        # Update the weights of the Neural Network every n steps past batch_size steps
+        q = None
+        loss = None
+        # Added a new warmup mechanism
+        if (
+            self.frame_count > 50_000
+            and self.frame_count % self.update_frequency == 0
+            and len(self.replay_buffer) > self.batch_size
+        ):
+            loss, q = self.update_cnn_weights()
+
+        # Reset the delayed network every m steps
+        if (
+            self.frame_count > 50_000
+            and self.frame_count > 0
+            and self.frame_count % self.update_target_frequency == 0
+        ):
+            self.reset_target_network()
+
+        self.prev_state = None
+        self.prev_action = None
+        return loss, q
 
 
 #####################################################################
@@ -758,6 +878,7 @@ class CartPoleDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -777,6 +898,7 @@ class CartPoleDQNAgent(DQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -796,6 +918,7 @@ class CartPoleDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -815,6 +938,7 @@ class CartPoleDDQNAgent(DDQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -834,6 +958,7 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
@@ -853,6 +978,7 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            max_clip,
             nstep_buffer_size,
         )
 
@@ -876,6 +1002,7 @@ class MountainCarDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -895,6 +1022,7 @@ class MountainCarDQNAgent(DQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -914,6 +1042,7 @@ class MountainCarDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -933,6 +1062,7 @@ class MountainCarDDQNAgent(DDQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -952,6 +1082,7 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
@@ -971,6 +1102,7 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            max_clip,
             nstep_buffer_size,
         )
 
@@ -994,6 +1126,7 @@ class AcrobotDQNAgent(DQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -1013,6 +1146,7 @@ class AcrobotDQNAgent(DQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -1032,6 +1166,7 @@ class AcrobotDDQNAgent(DDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size=None,
     ):
         main = MLP(n_obs, num_actions)
@@ -1051,6 +1186,7 @@ class AcrobotDDQNAgent(DDQN):
             main,
             delayed,
             seed,
+            max_clip,
         )
 
 
@@ -1070,6 +1206,7 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
         update_target_frequency: int,
         model_lr: float,
         seed: int,
+        max_clip: int,
         nstep_buffer_size: int,
     ):
         main = MLP(n_obs, num_actions)
@@ -1089,5 +1226,6 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
             main,
             delayed,
             seed,
+            max_clip,
             nstep_buffer_size,
         )
