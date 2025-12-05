@@ -15,7 +15,7 @@ env = gym.make(
 env = AtariPreprocessing(
     env,
     noop_max=10,
-    terminal_on_life_loss=True,
+    terminal_on_life_loss=False,
     screen_size=84,
     grayscale_obs=True,
     grayscale_newaxis=False,

@@ -3,28 +3,87 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from Neural_Networks import MLP
+import pandas as pd
 
-# -------------------------------
-# Load environment
-# -------------------------------
-env = gym.make("CartPole-v1")
-discount = 0.99
-EPISODES = 50
-STEPS = 500
+############################################################################
+#  Settings for plotting learning curves
+############################################################################
+seeds = [0, 42, 123]
+metrics = ["Reward", "Loss", "Length"]
+end_1 = "0_checkpoints/episode_metrics.csv"
+end_2 = "42_checkpoints/episode_metrics.csv"
+end_3 = "123_checkpoints/episode_metrics.csv"
+end_n_1 = "3_checkpoints/episode_metrics.csv"
+end_n_2 = "5_checkpoints/episode_metrics.csv"
+end_n_3 = "6_checkpoints/episode_metrics.csv"
+environments = ["Acrobot-v1", "CartPole-v1"]
+
+def load_csv_series(path, column="Reward"):
+    df = pd.read_csv(path, skiprows=1, sep=r"\s+", names=["Reward", "Loss", "Length"], engine="python")
+    return df[column].to_numpy()
+
+def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
+    """
+    metric_dict = {
+        "DQN":  [file_seed1.csv, file_seed2.csv, file_seed3.csv],
+        "DDQN": [file_seed1.csv, file_seed2.csv, file_seed3.csv],
+    }
+    """
+
+    plt.figure(figsize=(10,6))
+
+    for algo, file_list in metric_dict.items():
+
+        # Load all seeds for this algorithm
+        curves = [load_csv_series(f, column=ylabel) for f in file_list]
+
+        # Stack into array shape (seeds, episodes)
+        arr = np.vstack(curves)
+
+        # Compute median and quantiles
+        median = np.median(arr, axis=0)
+        q10 = np.quantile(arr, 0.10, axis=0)
+        q90 = np.quantile(arr, 0.90, axis=0)
+
+        x = np.arange(len(median))
+
+        # Plot median
+        plt.plot(x, median, label=algo, color=colors[algo], linewidth=2)
+
+        # Plot quantile shading
+        plt.fill_between(x, q10, q90, color=colors[algo], alpha=0.2)
+
+    plt.title(title, fontsize=16)
+    plt.xlabel("Episode", fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+    plt.grid(alpha=0.3)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+    plt.savefig(save_path)
 
 def transform(state):
     return torch.tensor(state, dtype=torch.float32).unsqueeze(0)
 
 # -------------------------------
-# Load your trained DQN + DDQN
+# Load environment
 # -------------------------------
-dqn = MLP(num_actions=2)
-ddqn_online = MLP(num_actions=2)
-ddqn_target = MLP(num_actions=2)
+"""
+env = gym.make("Acrobot-v1")
+discount = 0.99
+EPISODES = 200
+STEPS = 500
+num_actions = env.action_space.n
 
-dqn.load_state_dict(torch.load("CartPole_Environment/cartpole_DQN_agent.pt"))
-ddqn_online.load_state_dict(torch.load("CartPole_Environment/cartpole_DDQN_agent.pt"))
-ddqn_target.load_state_dict(torch.load("CartPole_Environment/cartpole_DDQN_target_agent.pt"))
+# -------------------------------
+# Load trained DQN + DDQN
+# -------------------------------
+dqn = MLP(num_actions=num_actions)
+ddqn_online = MLP(num_actions=num_actions)
+ddqn_target = MLP(num_actions=num_actions)
+
+dqn.load_state_dict(torch.load("Acrobot_Environment/acrobot_DQN_agent.pt"))
+ddqn_online.load_state_dict(torch.load("Acrobot_Environment/acrobot_DDQN_agent.pt"))
+ddqn_target.load_state_dict(torch.load("Acrobot_Environment/acrobot_DDQN_target_agent.pt"))
 
 dqn.eval()
 ddqn_online.eval()
@@ -71,20 +130,112 @@ for episode in range(EPISODES):
             break
 
 env.close()
+"""
 
-# ---------------------------------
-# Plot results
-# ---------------------------------
-plt.figure(figsize=(8,5))
-plt.plot(dqn_biases, alpha=0.7, label="DQN Bias (Online - Target)")
-plt.plot(ddqn_biases, alpha=0.7, label="DDQN Bias (Online - Target)")
-plt.axhline(0, color="black", linewidth=1)
-plt.title("Maximization Bias Comparison (CartPole)")
-plt.xlabel("Time Steps Across Episodes")
-plt.ylabel("Q(s,a) - Q_target(s,a)")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-# plt.savefig("max_bias_comparison.png")
-plt.show()
 
+############################################################################
+# Plotting different N-step values for N-step DDQN
+############################################################################
+n_steps = [3, 5, 6]
+colors = {
+    "N-step=3": "orange",
+    "N-step=5": "blue",
+    "N-step=6": "green"
+}
+def nstepddqn_comparison():
+    for env_name in environments:
+        for metric in metrics:
+            plot_ddqn_style(
+                metric_dict = {
+                    "N-step=3": [
+                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_1}",
+                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_1}",
+                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_1}",
+                    ],
+                    "N-step=5": [
+                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_2}",
+                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_2}",
+                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_2}",
+                    ],
+                    "N-step=6": [
+                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_3}",
+                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_3}",
+                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_3}",
+                    ],
+                },
+                title=f"{env_name} {metric} Learning Curve for different N values",
+                ylabel=metric,
+                colors=colors,
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_nstepddqn_comparison.png"
+            )
+
+
+############################################################################
+# Plotting DQN vs DDQN vs NstepDDQN Learning Curves
+############################################################################
+def dqn_vs_ddqn():
+    colors = {
+        "DQN":  "orange",
+        "DDQN": "blue"
+    }
+    for env_name in environments:
+        metric_dict = {
+            "DQN": [
+                f"{env_name}_Environment/dqn/{end_1}",
+                f"{env_name}_Environment/dqn/{end_2}",
+                f"{env_name}_Environment/dqn/{end_3}",
+            ],
+            "DDQN": [
+                f"{env_name}_Environment/ddqn/{end_1}",
+                f"{env_name}_Environment/ddqn/{end_2}",
+                f"{env_name}_Environment/ddqn/{end_3}",
+            ]
+        }
+        for metric in metrics:
+            # Plot DQN vs DDQN Metrics averaged and quantiled over seeds
+            plot_ddqn_style(
+                metric_dict = metric_dict,
+                title=f"{env_name} {metric} Learning Curve",
+                ylabel=metric,
+                colors=colors,
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn.png"
+            ) 
+
+def dqn_vs_ddqn_nstep():
+    colors = {
+        "DQN":  "orange",
+        "DDQN": "blue",
+        "NstepDDQN": "green"
+    }
+    for env_name in environments:
+        for metric in metrics:
+            # Plot DQN vs DDQN vs N-step DDQN Metrics averaged and quantiled over seeds
+            plot_ddqn_style(
+                metric_dict = {
+                    "DQN": [
+                        f"{env_name}_Environment/dqn/{end_1}",
+                        f"{env_name}_Environment/dqn/{end_2}",
+                        f"{env_name}_Environment/dqn/{end_3}",
+                    ],
+                    "DDQN": [
+                        f"{env_name}_Environment/ddqn/{end_1}",
+                        f"{env_name}_Environment/ddqn/{end_2}",
+                        f"{env_name}_Environment/ddqn/{end_3}",
+                    ],
+                    "NstepDDQN": [
+                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_1}",
+                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_1}",
+                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_1}",
+                    ],
+                },
+                title=f"{env_name} {metric} Learning Curve",
+                ylabel=metric,
+                colors=colors,
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn_nstepddqn.png"
+            )
+
+def main():            
+    dqn_vs_ddqn_nstep()
+
+
+main()

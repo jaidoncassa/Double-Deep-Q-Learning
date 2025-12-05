@@ -1,19 +1,40 @@
-from Neural_Networks import MLP
+from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
+from Metrics import MetricLogger
+from Neural_Networks import CNN, MLP
 from tqdm.auto import tqdm
+from pathlib import Path
 import gymnasium as gym
-import numpy as np
+import ale_py
 import torch
 
-env = gym.make("Acrobot-v1", render_mode="human")
-num_actions = env.action_space.n
+# Initialize the environment
+env = gym.make(
+    "MsPacmanNoFrameskip-v4", render_mode="human"
+)
 
+# Render the state space as a square 84x84 gray image
+env = AtariPreprocessing(
+    env,
+    noop_max=10,
+    terminal_on_life_loss=False,
+    screen_size=84,
+    grayscale_obs=True,
+    grayscale_newaxis=False,
+)
 
-def transform(state):
-    t = torch.tensor(state, dtype=torch.float32)
-    return t.unsqueeze(0)
+env = FrameStackObservation(env, 4)
+
+# def transform(state):
+#     t = torch.tensor(state, dtype=torch.float32)
+#     return t.unsqueeze(0)
+
+def transform(img):
+        # Must normalize and turn into a tensor object
+        return torch.from_numpy(img).float().unsqueeze(0) / 255.0
 
 
 state, info = env.reset()
+num_actions = env.action_space.n
 done = False
 total_reward = 0.0
 n_obs = len(state)
@@ -21,10 +42,13 @@ n_obs = len(state)
 # print(state)
 
 # CNN model information
-model = MLP(n_obs, num_actions=num_actions)
+model = CNN(num_actions=num_actions)
 model.load_state_dict(
-    torch.load("Acrobot-v1_Environment/ddqn/42_checkpoints/ddqn_42_agent.pt")
+    torch.load("MsPacmanNoFrameskip-v4_Environment/nstepddqn/seed_42/3_checkpoints/nstepddqn_19_agent.pt")
 )
+# model.load_state_dict(
+#     torch.load("models/mspacman_dqn_mps_5.pt")
+# )
 model.eval()
 
 while not done:
