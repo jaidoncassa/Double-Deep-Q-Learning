@@ -332,7 +332,7 @@ def main():
                 pbar.update(1)
 
             # Either we step or we terminate and reset
-            if terminated:
+            if done:
                 loss, q = agent.agent_end(reward)
             else:
                 action, loss, q = agent.agent_step(next_state, reward)

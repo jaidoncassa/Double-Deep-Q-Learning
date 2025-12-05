@@ -7,7 +7,7 @@ import ale_py
 import torch
 
 # Initialize the environment
-env = gym.make("Pendulum-v1", render_mode="human")
+env = gym.make("ALE/Pong-v5", render_mode="human")
 
 # Environment settings
 state, _ = env.reset()

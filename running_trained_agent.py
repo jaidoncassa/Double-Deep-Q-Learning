@@ -22,19 +22,19 @@ env = gym.make("MountainCar-v0", render_mode="human")
 
 # env = FrameStackObservation(env, 4)
 
-# def transform(state):
-#     t = torch.tensor(state, dtype=torch.float32)
-#     return t.unsqueeze(0)
+def transform(state):
+    t = torch.tensor(state, dtype=torch.float32)
+    return t.unsqueeze(0)
 
 
-def transform(img):
-    # Must normalize and turn into a tensor object
-    return torch.from_numpy(img).float().unsqueeze(0) / 255.0
+# def transform(img):
+#     # Must normalize and turn into a tensor object
+#     return torch.from_numpy(img).float().unsqueeze(0) / 255.0
 
 
 state, info = env.reset()
 num_actions = env.action_space.n
-obs = state
+n_observations = len(state)
 done = False
 total_reward = 0.0
 n_obs = len(state)
@@ -42,10 +42,10 @@ n_obs = len(state)
 # print(state)
 
 # CNN model information
-model = MLP(num_actions=num_actions)
+model = MLP(n_observations=n_observations, num_actions=num_actions)
 model.load_state_dict(
     torch.load(
-        "MsPacmanNoFrameskip-v4_Environment/nstepddqn/seed_42/3_checkpoints/nstepddqn_19_agent.pt"
+        "MountainCar-v0_Environment/ddqn/123_checkpoints/ddqn_123_agent.pt"
     )
 )
 # model.load_state_dict(
@@ -59,6 +59,9 @@ while not done:
     with torch.no_grad():
         q_values = model(s).squeeze(0)
         action = torch.argmax(q_values).item()
+
+        # Debugging info
+        print(f"Q-values: {q_values}, Action: {action}")
 
     # Take the action and see what happens
     state, reward, terminated, truncated, info = env.step(action)
