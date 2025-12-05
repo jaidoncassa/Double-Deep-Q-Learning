@@ -11,8 +11,8 @@ import torch
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-algorithms = ["DDQN", "DQN","nStepDDQN"]
-    # Environment specific settings
+algorithms = ["nStepDDQN", "DDQN", "DQN"]
+# Environment specific settings
 SAVE_RATE = 500_000
 FRAME_UPDATE = 10_000
 seeds = [0, 42, 123]
@@ -230,7 +230,7 @@ for game in environments:
                                     episode_count, agent.eps_threshold, total_frames
                                 )
 
-                            # Save a progress model 
+                            # Save a progress model
                             if total_frames % SAVE_RATE == 0:
                                 torch.save(
                                     agent.main_net.state_dict(),

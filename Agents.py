@@ -658,6 +658,24 @@ class MsPacmanDQNAgent(DQN):
         # Must normalize and turn into a tensor object
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
+    def reset_target_network(self):
+        "Overwrite this method with hard-updates and soft-updates"
+        target_net_state_dict = self.delayed_net.state_dict()
+        policy_net_state_dict = self.main_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]
+        self.delayed_net.load_state_dict(target_net_state_dict)
+        return
+
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
+        )
+
 
 class MsPacmanDDQNAgent(DDQN):
     def __init__(
@@ -701,6 +719,24 @@ class MsPacmanDDQNAgent(DDQN):
     def transform(self, img):
         # Must normalize and turn into a tensor object
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+
+    def reset_target_network(self):
+        "Overwrite this method with hard-updates and soft-updates"
+        target_net_state_dict = self.delayed_net.state_dict()
+        policy_net_state_dict = self.main_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]
+        self.delayed_net.load_state_dict(target_net_state_dict)
+        return
+
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
+        )
 
 
 class MsPacmanNStepDDQNAgent(nStepDDQN):
@@ -1016,6 +1052,15 @@ class MountainCarDQNAgent(DQN):
             max_clip,
         )
 
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
+        )
+
 
 class MountainCarDDQNAgent(DDQN):
     def __init__(
@@ -1054,6 +1099,15 @@ class MountainCarDDQNAgent(DDQN):
             delayed,
             seed,
             max_clip,
+        )
+
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
         )
 
 
@@ -1095,6 +1149,15 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             seed,
             max_clip,
             nstep_buffer_size,
+        )
+
+    def set_epsilon(self):
+        # Linear decays epsilon based on the number of frames processed.
+        self.eps_threshold = (
+            self.final_epsilon
+            + (self.initial_epsilon - self.final_epsilon)
+            * max(0, (self.epsilon_decay - self.frame_count))
+            / self.epsilon_decay
         )
 
 
