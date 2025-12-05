@@ -60,14 +60,14 @@ def main():
                 processes.append(p)
 
         # Wait for all three to finish
-        # for p in processes:
-        #     p.wait()
+        for p in processes:
+            p.wait()
 
-        # print(f"\n==============================")
-        # print(f"  FINISHED SEED {seed} FOR {ENV_NAME}")
-        # print(f"==============================\n")
-        # # Optional small pause between seeds
-        # time.sleep(2)
+        print(f"\n==============================")
+        print(f"  FINISHED SEED {seed} FOR {ENV_NAME}")
+        print(f"==============================\n")
+        # Optional small pause between seeds
+        time.sleep(2)
 
 
 if __name__ == "__main__":
