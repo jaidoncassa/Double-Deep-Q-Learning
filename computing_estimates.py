@@ -18,9 +18,17 @@ end_n_2 = "5_checkpoints/episode_metrics.csv"
 end_n_3 = "6_checkpoints/episode_metrics.csv"
 environments = ["Acrobot-v1", "CartPole-v1"]
 
+
 def load_csv_series(path, column="Reward"):
-    df = pd.read_csv(path, skiprows=1, sep=r"\s+", names=["Reward", "Loss", "Length"], engine="python")
+    df = pd.read_csv(
+        path,
+        skiprows=1,
+        sep=r"\s+",
+        names=["Reward", "Loss", "Length"],
+        engine="python",
+    )
     return df[column].to_numpy()
+
 
 def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
     """
@@ -30,7 +38,7 @@ def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
     }
     """
 
-    plt.figure(figsize=(10,6))
+    plt.figure(figsize=(10, 6))
 
     for algo, file_list in metric_dict.items():
 
@@ -61,8 +69,10 @@ def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
     plt.tight_layout()
     plt.savefig(save_path)
 
+
 def transform(state):
     return torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+
 
 # -------------------------------
 # Load environment
@@ -137,16 +147,14 @@ env.close()
 # Plotting different N-step values for N-step DDQN
 ############################################################################
 n_steps = [3, 5, 6]
-colors = {
-    "N-step=3": "orange",
-    "N-step=5": "blue",
-    "N-step=6": "green"
-}
+colors = {"N-step=3": "orange", "N-step=5": "blue", "N-step=6": "green"}
+
+
 def nstepddqn_comparison():
     for env_name in environments:
         for metric in metrics:
             plot_ddqn_style(
-                metric_dict = {
+                metric_dict={
                     "N-step=3": [
                         f"{env_name}_Environment/nstepddqn/seed_0/{end_n_1}",
                         f"{env_name}_Environment/nstepddqn/seed_42/{end_n_1}",
@@ -166,7 +174,7 @@ def nstepddqn_comparison():
                 title=f"{env_name} {metric} Learning Curve for different N values",
                 ylabel=metric,
                 colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_nstepddqn_comparison.png"
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_nstepddqn_comparison.png",
             )
 
 
@@ -174,10 +182,7 @@ def nstepddqn_comparison():
 # Plotting DQN vs DDQN vs NstepDDQN Learning Curves
 ############################################################################
 def dqn_vs_ddqn():
-    colors = {
-        "DQN":  "orange",
-        "DDQN": "blue"
-    }
+    colors = {"DQN": "orange", "DDQN": "blue"}
     for env_name in environments:
         metric_dict = {
             "DQN": [
@@ -189,29 +194,26 @@ def dqn_vs_ddqn():
                 f"{env_name}_Environment/ddqn/{end_1}",
                 f"{env_name}_Environment/ddqn/{end_2}",
                 f"{env_name}_Environment/ddqn/{end_3}",
-            ]
+            ],
         }
         for metric in metrics:
             # Plot DQN vs DDQN Metrics averaged and quantiled over seeds
             plot_ddqn_style(
-                metric_dict = metric_dict,
+                metric_dict=metric_dict,
                 title=f"{env_name} {metric} Learning Curve",
                 ylabel=metric,
                 colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn.png"
-            ) 
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn.png",
+            )
+
 
 def dqn_vs_ddqn_nstep():
-    colors = {
-        "DQN":  "orange",
-        "DDQN": "blue",
-        "NstepDDQN": "green"
-    }
+    colors = {"DQN": "orange", "DDQN": "blue", "NstepDDQN": "green"}
     for env_name in environments:
         for metric in metrics:
             # Plot DQN vs DDQN vs N-step DDQN Metrics averaged and quantiled over seeds
             plot_ddqn_style(
-                metric_dict = {
+                metric_dict={
                     "DQN": [
                         f"{env_name}_Environment/dqn/{end_1}",
                         f"{env_name}_Environment/dqn/{end_2}",
@@ -231,10 +233,12 @@ def dqn_vs_ddqn_nstep():
                 title=f"{env_name} {metric} Learning Curve",
                 ylabel=metric,
                 colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn_nstepddqn.png"
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn_nstepddqn.png",
             )
 
-def main():            
+
+def main():
+    nstepddqn_comparison()
     dqn_vs_ddqn_nstep()
 
 
