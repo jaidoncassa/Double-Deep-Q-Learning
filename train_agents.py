@@ -16,7 +16,8 @@ algorithms = ["nStepDDQN", "DDQN", "DQN"]
 SAVE_RATE = 500_000
 FRAME_UPDATE = 10_000
 seeds = [0, 42, 123]
-environments = [
+
+atari_environment = [
     # {
     #     "name": "MsPacmanNoFrameskip-v4",
     #     "max_episodes": None,
@@ -39,6 +40,52 @@ environments = [
     #         Agents.MsPacmanNStepDDQNAgent,
     #     ],
     # },
+    {
+        "name": "PongNoFrameskip-v4",
+        "max_episodes": None,
+        "max_frames": 20_000_000,
+        "max_steps_per_eps": 10_000,
+        "update_target_frequency": 10_000,
+        "buffer_size": 1_000_000,
+        "update_frequency": 4,
+        "batch_size": 32,
+        "LR": 1e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3],
+        "EPS_START": 1.0,
+        "EPS_END": 0.1,
+        "EPS_DECAY": 1_000_000,
+        "max_norm_clipping": 10,
+        "agent_class": [
+            Agents.MsPacmanDQNAgent,
+            Agents.MsPacmanDDQNAgent,
+            Agents.MsPacmanNStepDDQNAgent,
+        ],
+    },
+    {
+        "name": "FreewayNoFrameSkip-v0",
+        "max_episodes": None,
+        "max_frames": 20_000_000,
+        "max_steps_per_eps": 10_000,
+        "update_target_frequency": 10_000,
+        "buffer_size": 1_000_000,
+        "update_frequency": 4,
+        "batch_size": 32,
+        "LR": 1e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3],
+        "EPS_START": 1.0,
+        "EPS_END": 0.1,
+        "EPS_DECAY": 1_000_000,
+        "max_norm_clipping": 10,
+        "agent_class": [
+            Agents.MsPacmanDQNAgent,
+            Agents.MsPacmanDDQNAgent,
+            Agents.MsPacmanNStepDDQNAgent,
+        ],
+    },
+]
+classic_control_environments = [
     # {
     #     "name": "CartPole-v1",
     #     "max_episodes": 600,
@@ -69,13 +116,13 @@ environments = [
         "update_target_frequency": 1,
         "buffer_size": 100_000,
         "update_frequency": 1,
-        "batch_size": 64,
-        "LR": 5e-4,
-        "discount": 0.99,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.995,
         "n_step_buffer_sizes": [3, 5, 6],
         "EPS_START": 1.0,
         "EPS_END": 0.02,
-        "EPS_DECAY": 10_000,
+        "EPS_DECAY": 12_000,
         "max_norm_clipping": 10,
         "agent_class": [
             Agents.MountainCarDQNAgent,
@@ -107,7 +154,7 @@ environments = [
     # },
 ]
 
-for game in environments:
+for game in classic_control_environments:
     for seed in seeds:
         for ALGO_NAME in algorithms:
 
