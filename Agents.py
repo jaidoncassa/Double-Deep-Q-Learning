@@ -173,6 +173,7 @@ class DQN:
         return loss.item(), avg_q_value
 
     def reset_target_network(self):
+        # Soft update of target network's weights
         TAU = 0.005
         with torch.no_grad():
             for target_param, param in zip(
@@ -181,16 +182,6 @@ class DQN:
                 target_param.data.copy_(
                     TAU * param.data + (1 - TAU) * target_param.data
                 )
-        # TAU = 0.005
-        # # Soft update of the target network's weights
-        # # θ′ ← τ θ + (1 −τ )θ′
-        # target_net_state_dict = self.delayed_net.state_dict()
-        # policy_net_state_dict = self.main_net.state_dict()
-        # for key in policy_net_state_dict:
-        #     target_net_state_dict[key] = policy_net_state_dict[
-        #         key
-        #     ] * TAU + target_net_state_dict[key] * (1 - TAU)
-        # self.delayed_net.load_state_dict(target_net_state_dict)
 
     def get_action(self, q_values):
         """Choose an action using Epsilon greedy approach

@@ -11,33 +11,34 @@ import torch
 # USE_DOUBLE_DQN = False
 # ALGO_NAME = "DDQN" if USE_DOUBLE_DQN else "DQN"
 
-algorithms = ["nStepDDQN"]
-seeds = [42]
+algorithms = ["DDQN", "DQN","nStepDDQN"]
+    # Environment specific settings
 SAVE_RATE = 500_000
 FRAME_UPDATE = 10_000
+seeds = [0, 42, 123]
 environments = [
-    {
-        "name": "MsPacmanNoFrameskip-v4",
-        "max_episodes": None,
-        "max_frames": 20_000_000,
-        "max_steps_per_eps": 10_000,
-        "update_target_frequency": 10_000,
-        "buffer_size": 1_000_000,
-        "update_frequency": 4,
-        "batch_size": 32,
-        "LR": 1e-4,
-        "discount": 0.99,
-        "n_step_buffer_sizes": [3],
-        "EPS_START": 1.0,
-        "EPS_END": 0.1,
-        "EPS_DECAY": 1_000_000,
-        "max_norm_clipping": 10,
-        "agent_class": [
-            Agents.MsPacmanDQNAgent,
-            Agents.MsPacmanDDQNAgent,
-            Agents.MsPacmanNStepDDQNAgent,
-        ],
-    },
+    # {
+    #     "name": "MsPacmanNoFrameskip-v4",
+    #     "max_episodes": None,
+    #     "max_frames": 20_000_000,
+    #     "max_steps_per_eps": 10_000,
+    #     "update_target_frequency": 10_000,
+    #     "buffer_size": 1_000_000,
+    #     "update_frequency": 4,
+    #     "batch_size": 32,
+    #     "LR": 1e-4,
+    #     "discount": 0.99,
+    #     "n_step_buffer_sizes": [3],
+    #     "EPS_START": 1.0,
+    #     "EPS_END": 0.1,
+    #     "EPS_DECAY": 1_000_000,
+    #     "max_norm_clipping": 10,
+    #     "agent_class": [
+    #         Agents.MsPacmanDQNAgent,
+    #         Agents.MsPacmanDDQNAgent,
+    #         Agents.MsPacmanNStepDDQNAgent,
+    #     ],
+    # },
     # {
     #     "name": "CartPole-v1",
     #     "max_episodes": 600,
@@ -60,28 +61,28 @@ environments = [
     #         Agents.CartPoleNStepDDQNAgent,
     #     ],
     # },
-    # {
-    #     "name": "MountainCar-v0",
-    #     "max_episodes": 2000,
-    #     "max_frames: None,
-    #     "max_steps_per_eps": 200,
-    #     "update_target_frequency": 1,
-    #     "buffer_size": 10_000,
-    #     "update_frequency": 1,
-    #     "batch_size": 128,
-    #     "LR": 3e-4,
-    #     "discount": 0.95,
-    #     "n_step_buffer_sizes": [3, 5, 6],
-    #     "EPS_START": 0.9,
-    #     "EPS_END": 0.01,
-    #     "EPS_DECAY": 20_000,
-    #     "max_norm_clipping": 100,
-    #     "agent_class": [
-    #         Agents.MountainCarDQNAgent,
-    #         Agents.MountainCarDDQNAgent,
-    #         Agents.MountainCarNStepDDQNAgent,
-    #     ],
-    # },
+    {
+        "name": "MountainCar-v0",
+        "max_episodes": 2500,
+        "max_frames": None,
+        "max_steps_per_eps": 200,
+        "update_target_frequency": 1,
+        "buffer_size": 100_000,
+        "update_frequency": 1,
+        "batch_size": 64,
+        "LR": 5e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3, 5, 6],
+        "EPS_START": 1.0,
+        "EPS_END": 0.02,
+        "EPS_DECAY": 10_000,
+        "max_norm_clipping": 10,
+        "agent_class": [
+            Agents.MountainCarDQNAgent,
+            Agents.MountainCarDDQNAgent,
+            Agents.MountainCarNStepDDQNAgent,
+        ],
+    },
     # {
     #     "name": "Acrobot-v1",
     #     "max_episodes": 2000,
@@ -208,7 +209,10 @@ for game in environments:
                         # Update stats
                         episode_reward += reward
                         total_frames += 1
-                        pbar.update(1)
+
+                        # Update progress bar only if driven by frames
+                        if MAX_EPISODES == None:
+                            pbar.update(1)
 
                         # Either we step or we terminate and reset
                         if terminated:
@@ -219,21 +223,27 @@ for game in environments:
                         # log a step
                         logger.log_step(reward, loss, q)
 
-                        # Update progress bar and log moving averages
-                        if total_frames > 0 and total_frames % FRAME_UPDATE == 0:
-                            logger.record(
-                                episode_count, agent.eps_threshold, total_frames
-                            )
+                        # Specific MsPacman logging and saving
+                        if game["name"] == "MsPacmanNoFrameskip-v4":
+                            if total_frames > 0 and total_frames % FRAME_UPDATE == 0:
+                                logger.record(
+                                    episode_count, agent.eps_threshold, total_frames
+                                )
 
-                        # Save a progress model
-                        if total_frames % SAVE_RATE == 0:
-                            torch.save(
-                                agent.main_net.state_dict(),
-                                f"{prefix}/{ALGO_NAME.lower()}_{total_frames // SAVE_RATE}_agent.pt",
-                            )
+                            # Save a progress model 
+                            if total_frames % SAVE_RATE == 0:
+                                torch.save(
+                                    agent.main_net.state_dict(),
+                                    f"{prefix}/{ALGO_NAME.lower()}_{total_frames // SAVE_RATE}_agent.pt",
+                                )
 
+                        # Break the episode loop
                         if done:
                             break
+
+                    # Update progress bar only if driven by episodes
+                    if MAX_EPISODES != None:
+                        pbar.update(1)
 
                     # Episode end
                     episode_count += 1
