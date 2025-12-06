@@ -5,158 +5,137 @@ from pathlib import Path
 import gymnasium as gym
 import random
 import Agents
-
-# import ale_py
+import ale_py
 import torch
 import argparse
-
-atari_environment = [
-    # {
-    #     "name": "MsPacmanNoFrameskip-v4",
-    #     "max_episodes": None,
-    #     "max_frames": 20_000_000,
-    #     "max_steps_per_eps": 10_000,
-    #     "update_target_frequency": 10_000,
-    #     "warmup_amt": 50_000,
-    #     "buffer_size": 1_000_000,
-    #     "update_frequency": 4,
-    #     "batch_size": 32,
-    #     "LR": 1e-4,
-    #     "discount": 0.99,
-    #     "n_step_buffer_sizes": [3],
-    #     "EPS_START": 1.0,
-    #     "EPS_END": 0.1,
-    #     "EPS_DECAY": 1_000_000,
-    #     "max_norm_clipping": 10,
-    #     "agent_class": [
-    #         Agents.MsPacmanDQNAgent,
-    #         Agents.MsPacmanDDQNAgent,
-    #         Agents.MsPacmanNStepDDQNAgent,
-    #     ],
-    # },
-]
-classic_control_environments = [
-    # {
-    #     "name": "CartPole-v1",
-    #     "max_episodes": 600,
-    #     "max_steps_per_eps": 500,
-    #     "max_frames: None,
-    #     "update_target_frequency": 1,
-    #     "warmup_amt": 0,
-    #     "buffer_size": 10_000,
-    #     "update_frequency": 1,
-    #     "batch_size": 128,
-    #     "LR": 3e-4,
-    #     "discount": 0.99,
-    #     "n_step_buffer_sizes": [3, 5, 6],
-    #     "EPS_START": 0.9,
-    #     "EPS_END": 0.01,
-    #     "EPS_DECAY": 2_500,
-    #     "max_norm_clipping": 100,
-    #     "agent_class": [
-    #         Agents.CartPoleDQNAgent,
-    #         Agents.CartPoleDDQNAgent,
-    #         Agents.CartPoleNStepDDQNAgent,
-    #     ],
-    # },
-    {
-        "name": "MountainCar-v0",
-        "max_episodes": 2500,
-        "max_frames": None,
-        "max_steps_per_eps": 200,
-        "update_target_frequency": 1,
-        "warmup_amt": 5_000,
-        "buffer_size": 100_000,
-        "update_frequency": 1,
-        "batch_size": 128,
-        "LR": 3e-4,
-        "discount": 0.995,
-        "n_step_buffer_sizes": [3, 5, 6],
-        "EPS_START": 1.0,
-        "EPS_END": 0.02,
-        "EPS_DECAY": 12_000,
-        "max_norm_clipping": 10,
-        "agent_class": [
-            Agents.MountainCarDQNAgent,
-            Agents.MountainCarDDQNAgent,
-            Agents.MountainCarNStepDDQNAgent,
-        ],
-    },
-    # {
-    #     "name": "Acrobot-v1",
-    #     "max_episodes": 2000,
-    #     "max_frames: None,
-    #     "max_steps_per_eps": 500,
-    #     "update_target_frequency": 1,
-    #     "warmup_amt": 0,
-    #     "buffer_size": 10_000,
-    #     "update_frequency": 1,
-    #     "batch_size": 128,
-    #     "LR": 3e-4,
-    #     "discount": 0.99,
-    #     "n_step_buffer_sizes": [3, 5, 6],
-    #     "EPS_START": 0.9,
-    #     "EPS_END": 0.01,
-    #     "EPS_DECAY": 20_000,
-    #     "max_norm_clipping": 100,
-    #     "agent_class": [
-    #         Agents.AcrobotDQNAgent,
-    #         Agents.AcrobotDDQNAgent,
-    #         Agents.AcrobotNStepDDQNAgent,
-    #     ],
-    # },
-]
 
 ENV_CONFIGS = {
     # -----------------------------
     # Atari: Pong
     # -----------------------------
-    # "PongNoFrameskip-v4": {
-    #     "max_episodes": None,
-    #     "max_frames": 20_000_000,
-    #     "max_steps_per_eps": 10_000,
-    #     "update_target_frequency": 10_000,
-    #     "buffer_size": 1_000_000,
-    #     "update_frequency": 4,
-    #     "batch_size": 32,
-    #     "LR": 1e-4,
-    #     "discount": 0.99,
-    #     "n_step_buffer_sizes": [3],
-    #     "EPS_START": 1.0,
-    #     "EPS_END": 0.1,
-    #     "EPS_DECAY": 1_000_000,
-    #     "max_norm_clipping": 10,
-    #     # You were mistakenly using MsPacman agents here
-    #     "agent_class": [
-    #         Agents.PongDQNAgent,
-    #         Agents.PongDDQNAgent,
-    #         Agents.PongNStepDDQNAgent,
-    #     ],
-    #     "is_atari": True,
-    # },
+    "PongNoFrameskip-v4": {
+        "max_episodes": None,
+        "max_frames": 4_000_000,
+        "max_steps_per_eps": 10_000,
+        "update_target_frequency": 10_000,
+        "buffer_size": 1_000_000,
+        "update_frequency": 4,
+        "batch_size": 32,
+        "LR": 1e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3],
+        "EPS_START": 1.0,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 1_000_000,
+        "max_norm_clipping": 10,
+        "agent_class": [
+            Agents.AtariDQNAgent,
+            Agents.AtariDDQNAgent,
+            Agents.AtariNStepDDQNAgent,
+        ],
+        "is_atari": True,
+    },
+    # -----------------------------
+    # Atari: MsPacman
+    # -----------------------------
+    "MsPacmanNoFrameskip-v4": {
+        "max_episodes": None,
+        "max_frames": 20_000_000,
+        "max_steps_per_eps": 10_000,
+        "update_target_frequency": 10_000,
+        "warmup_amt": 50_000,
+        "buffer_size": 1_000_000,
+        "update_frequency": 4,
+        "batch_size": 32,
+        "LR": 1e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3],
+        "EPS_START": 1.0,
+        "EPS_END": 0.1,
+        "EPS_DECAY": 1_000_000,
+        "max_norm_clipping": 10,
+        "agent_class": [
+            Agents.AtariDQNAgent,
+            Agents.AtariDDQNAgent,
+            Agents.AtariNStepDDQNAgent,
+        ],
+        "is_atari": True,
+    },
     # -----------------------------
     # Classic Control: MountainCar
     # -----------------------------
     "MountainCar-v0": {
-        "max_episodes": 2500,
+        "max_episodes": 2200,
         "max_frames": None,
         "max_steps_per_eps": 200,
-        "update_target_frequency": 150,
-        "warmup_amt": 5_000,
-        "buffer_size": 100_000,
+        "update_target_frequency": 1,
+        "warmup_amt": 1,
+        "buffer_size": 10_000,
         "update_frequency": 1,
         "batch_size": 128,
-        "LR": 1e-4,
-        "discount": 0.99,
+        "LR": 3e-4,
+        "discount": 0.95,
         "n_step_buffer_sizes": [3, 5, 6],
         "EPS_START": 1.0,
-        "EPS_END": 0.02,
+        "EPS_END": 0.01,
         "EPS_DECAY": 20_000,
         "max_norm_clipping": 1,
         "agent_class": [
-            Agents.MountainCarDQNAgent,
-            Agents.MountainCarDDQNAgent,
-            Agents.MountainCarNStepDDQNAgent,
+            Agents.ControlDQN,
+            Agents.ControlDDQN,
+            Agents.ControlNStepDDQN,
+        ],
+        "is_atari": False,
+    },
+    # -----------------------------
+    # Classic Control: Acrobot-v1
+    # -----------------------------
+    "Acrobot-v1": {
+        "max_episodes": 2000,
+        "max_frames": None,
+        "max_steps_per_eps": 500,
+        "update_target_frequency": 1,
+        "warmup_amt": 1,
+        "buffer_size": 10_000,
+        "update_frequency": 1,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3, 5, 6],
+        "EPS_START": 0.9,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 20_000,
+        "max_norm_clipping": 100,
+        "agent_class": [
+            Agents.ControlDQN,
+            Agents.ControlDDQN,
+            Agents.ControlNStepDDQN,
+        ],
+        "is_atari": False,
+    },
+    # -----------------------------
+    # Classic Control: Cartpole-v1
+    # -----------------------------
+    "Cartpole-v1": {
+        "max_episodes": 600,
+        "max_steps_per_eps": 500,
+        "max_frames": None,
+        "update_target_frequency": 1,
+        "warmup_amt": 1,
+        "buffer_size": 10_000,
+        "update_frequency": 1,
+        "batch_size": 128,
+        "LR": 3e-4,
+        "discount": 0.99,
+        "n_step_buffer_sizes": [3, 5, 6],
+        "EPS_START": 0.9,
+        "EPS_END": 0.01,
+        "EPS_DECAY": 2_500,
+        "max_norm_clipping": 100,
+        "agent_class": [
+            Agents.ControlDQN,
+            Agents.ControlDDQN,
+            Agents.ControlNStepDDQN,
         ],
         "is_atari": False,
     },
@@ -204,7 +183,9 @@ def main():
         env = AtariPreprocessing(
             env,
             noop_max=10,
-            terminal_on_life_loss=True,
+            terminal_on_life_loss=(
+                True if ENV_NAME == "MsPacmanNoFrameskip-v4" else False
+            ),
             screen_size=84,
             grayscale_obs=True,
             grayscale_newaxis=False,
@@ -296,12 +277,12 @@ def main():
 
             # Either we step or we terminate and reset
             if done:
-                loss, q = agent.agent_end(reward)
+                loss, q, mean_max_q = agent.agent_end(reward)
             else:
-                action, loss, q = agent.agent_step(next_state, reward)
+                action, loss, q, mean_max_q = agent.agent_step(next_state, reward)
 
             # log a step
-            logger.log_step(reward, loss, q)
+            logger.log_step(reward, loss, q, mean_max_q)
 
             # Specific MsPacman logging and saving
             if game["is_atari"]:

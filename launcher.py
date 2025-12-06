@@ -1,18 +1,19 @@
 import subprocess
 import time
 
-# SEEDS = [0, 42, 123]
-# ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
 SEEDS = [0, 42, 123]
-ALGORITHMS = ["DDQN", "DQN"]
+ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
+
+# SEEDS = [0, 42, 123]
+# ALGORITHMS = ["DDQN", "DQN"]
 
 # Choose which environment to train on:
-# ENV_NAME = "PongNoFrameskip-v4"
-ENV_NAME = "MountainCar-v0"
+ENV_NAME = "PongNoFrameskip-v4"
+# ENV_NAME = "MountainCar-v0"
 
 
 # N-step value to use when algo == "nStepDDQN"
-NSTEP_VALUES = [3, 5, 6]
+NSTEP_VALUES = [3]
 
 # Python executable (change to "python3" if needed)
 PYTHON = "python"

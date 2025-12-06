@@ -132,15 +132,18 @@ class DQN:
             )  # Handle empty case
 
         # Q-Value Calculation
-
         # Compute Q(s_t, a) from the main network (State Action Values)
-        # policy_net(state_batch) gives Q(s_t) for all actions. gather(1, action_batch) selects the Q-value for the action taken.
-        state_action_values = self.main_net(state_batch)
-        state_action_values = state_action_values.gather(1, action_batch)
+        q_values_all = self.main_net(state_batch)  # shape [B, A]
+        state_action_values = q_values_all.gather(1, action_batch)
+
+        # For loggic purposes, I want to log the maximization bias by observing the max action from the current main network
+        with torch.no_grad():
+            mean_max_q = q_values_all.max(1).values.mean().item()
 
         # Compute the Target V(s_{t+1}) for all next states
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
+            # Now perform max_a with target network: MAXIMIZATION BIAS
             if non_final_next_states.numel() > 0:
                 # DQN logic: max_a Q(s', a; target)
                 next_state_values[non_final_mask] = (
@@ -172,7 +175,7 @@ class DQN:
         avg_q_value = torch.mean(state_action_values).item()
 
         # Return the loss and the average Q-value for logging
-        return loss.item(), avg_q_value
+        return loss.item(), avg_q_value, mean_max_q
 
     def reset_target_network(self):
         # Soft update of target network's weights
@@ -255,16 +258,17 @@ class DQN:
         # Include a warmup
         q = None
         loss = None
+        mean_max_q = None
         if (
-            self.frame_count % self.warmup_amt
+            self.frame_count > self.warmup_amt
             and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
-            loss, q = self.update_cnn_weights()
+            loss, q, mean_max_q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
         if (
-            self.frame_count % self.warmup_amt
+            self.frame_count > self.warmup_amt
             and self.frame_count > 0
             and self.frame_count % self.update_target_frequency == 0
         ):
@@ -274,7 +278,7 @@ class DQN:
         self.prev_state = state  # s
         self.prev_action = action  # a'
 
-        return action, loss, q
+        return action, loss, q, mean_max_q
 
     def agent_end(self, reward):
         """Run when the agent terminates
@@ -289,11 +293,12 @@ class DQN:
         # Update the weights of the Neural Network every n steps past batch_size steps
         q = None
         loss = None
+        mean_max_q = None
         if (
             self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
-            loss, q = self.update_cnn_weights()
+            loss, q, mean_max_q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
         if (
@@ -304,7 +309,7 @@ class DQN:
 
         self.prev_state = None
         self.prev_action = None
-        return loss, q
+        return loss, q, mean_max_q
 
     def push_transition(self, transition):
         # Save the full observation (s, a, R, s', done)
@@ -401,7 +406,12 @@ class DDQN(DQN):
             )
 
         # Compute Q(s_t, a) from the main network (State Action Values)
-        state_action_values = self.main_net(state_batch).gather(1, action_batch)
+        q_values_all = self.main_net(state_batch)  # shape [B, A]
+        state_action_values = q_values_all.gather(1, action_batch)
+
+        # For loggic purposes, I want to log the maximization bias by observing the max action from the current main network
+        with torch.no_grad():
+            mean_max_q = q_values_all.max(1).values.mean().item()
 
         # DDQN Q-Value Calculation
 
@@ -450,7 +460,7 @@ class DDQN(DQN):
         avg_q_value = torch.mean(state_action_values).item()
 
         # Return the loss and the average Q-value for logging
-        return loss.item(), avg_q_value
+        return loss.item(), avg_q_value, mean_max_q
 
 
 class nStepDDQN(DDQN):
@@ -535,7 +545,12 @@ class nStepDDQN(DDQN):
             )
 
         # Compute Q(s_t, a) from the main network (State Action Values)
-        q_sa = self.main_net(state_batch).gather(1, action_batch)
+        q_values_all = self.main_net(state_batch)  # shape [B, A]
+        q_sa = q_values_all.gather(1, action_batch)
+
+        # For loggic purposes, I want to log the maximization bias by observing the max action from the current main network
+        with torch.no_grad():
+            mean_max_q = q_values_all.max(1).values.mean().item()
 
         # DDQN Q-Value Calculation
 
@@ -588,7 +603,7 @@ class nStepDDQN(DDQN):
         avg_q_value = torch.mean(q_sa).item()
 
         # Return the loss and the average Q-value for logging
-        return loss.item(), avg_q_value
+        return loss.item(), avg_q_value, mean_max_q
 
     def push_transition(self, transition):
         self.nstep_buffer.append(transition)
@@ -623,9 +638,9 @@ class nStepDDQN(DDQN):
 
 
 #####################################################################
-# MsPacman subclasses
+# Atari subclasses
 #####################################################################
-class MsPacmanDQNAgent(DQN):
+class AtariDQNAgent(DQN):
     def __init__(
         self,
         env: gym.Env,
@@ -670,13 +685,7 @@ class MsPacmanDQNAgent(DQN):
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
     def reset_target_network(self):
-        "Overwrite this method with hard-updates and soft-updates"
-        target_net_state_dict = self.delayed_net.state_dict()
-        policy_net_state_dict = self.main_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]
-        self.delayed_net.load_state_dict(target_net_state_dict)
-        return
+        self.delayed_net.load_state_dict(self.main_net.state_dict())
 
     def set_epsilon(self):
         # Linear decays epsilon based on the number of frames processed.
@@ -688,7 +697,7 @@ class MsPacmanDQNAgent(DQN):
         )
 
 
-class MsPacmanDDQNAgent(DDQN):
+class AtariDDQNAgent(DDQN):
     def __init__(
         self,
         env: gym.Env,
@@ -733,15 +742,6 @@ class MsPacmanDDQNAgent(DDQN):
         # Must normalize and turn into a tensor object
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
 
-    def reset_target_network(self):
-        "Overwrite this method with hard-updates and soft-updates"
-        target_net_state_dict = self.delayed_net.state_dict()
-        policy_net_state_dict = self.main_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]
-        self.delayed_net.load_state_dict(target_net_state_dict)
-        return
-
     def set_epsilon(self):
         # Linear decays epsilon based on the number of frames processed.
         self.eps_threshold = (
@@ -752,16 +752,10 @@ class MsPacmanDDQNAgent(DDQN):
         )
 
     def reset_target_network(self):
-        "Overwrite this method with hard-updates and soft-updates"
-        target_net_state_dict = self.delayed_net.state_dict()
-        policy_net_state_dict = self.main_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]
-        self.delayed_net.load_state_dict(target_net_state_dict)
-        return
+        self.delayed_net.load_state_dict(self.main_net.state_dict())
 
 
-class MsPacmanNStepDDQNAgent(nStepDDQN):
+class AtariNStepDDQNAgent(nStepDDQN):
     def __init__(
         self,
         env: gym.Env,
@@ -844,14 +838,14 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         # Update the weights of the Neural Network every n steps past 32 steps
         q = None
         loss = None
-
+        mean_max_q = None
         # Added a new warmup mechanism
         if (
             self.frame_count > self.warmup_amt
             and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
-            loss, q = self.update_cnn_weights()
+            loss, q, mean_max_q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
         if (
@@ -865,7 +859,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         self.prev_state = state  # s
         self.prev_action = action  # a'
 
-        return action, loss, q
+        return action, loss, q, mean_max_q
 
     def agent_end(self, reward):
         """Run when the agent terminates
@@ -880,13 +874,14 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         # Update the weights of the Neural Network every n steps past batch_size steps
         q = None
         loss = None
+        mean_max_q = None
         # Added a new warmup mechanism
         if (
             self.frame_count > 50_000
             and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
-            loss, q = self.update_cnn_weights()
+            loss, q, mean_max_q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
         if (
@@ -898,318 +893,18 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
 
         self.prev_state = None
         self.prev_action = None
-        return loss, q
-
-    def reset_target_network(self):
-        "Overwrite this method with hard-updates and soft-updates"
-        target_net_state_dict = self.delayed_net.state_dict()
-        policy_net_state_dict = self.main_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]
-        self.delayed_net.load_state_dict(target_net_state_dict)
-        return
-
-
-#####################################################################
-# CartPole subclasses
-#####################################################################
-class CartPoleDQNAgent(DQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size=None,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-        )
-
-
-class CartPoleDDQNAgent(DDQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size=None,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-        )
-
-
-class CartPoleNStepDDQNAgent(nStepDDQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size: int,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-            nstep_buffer_size,
-        )
-
-
-#####################################################################
-# MountainCar subclasses
-#####################################################################
-class MountainCarDQNAgent(DQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size=None,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-        )
-
-    def set_epsilon(self):
-        # Linear decays epsilon based on the number of frames processed.
-        self.eps_threshold = (
-            self.final_epsilon
-            + (self.initial_epsilon - self.final_epsilon)
-            * max(0, (self.epsilon_decay - self.frame_count))
-            / self.epsilon_decay
-        )
-
-    def reset_target_network(self):
-        self.delayed_net.load_state_dict(self.main_net.state_dict())
-
-
-class MountainCarDDQNAgent(DDQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size=None,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-        )
-
-    def set_epsilon(self):
-        # Linear decays epsilon based on the number of frames processed.
-        self.eps_threshold = (
-            self.final_epsilon
-            + (self.initial_epsilon - self.final_epsilon)
-            * max(0, (self.epsilon_decay - self.frame_count))
-            / self.epsilon_decay
-        )
-
-    def reset_target_network(self):
-        self.delayed_net.load_state_dict(self.main_net.state_dict())
-
-
-class MountainCarNStepDDQNAgent(nStepDDQN):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_actions: int,
-        n_obs: int,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float,
-        buffer_size: int,
-        batch_size: int,
-        update_frequency: int,
-        update_target_frequency: int,
-        warmup_amt: int,
-        model_lr: float,
-        seed: int,
-        max_clip: int,
-        nstep_buffer_size: int,
-    ):
-        main = MLP(n_obs, num_actions)
-        delayed = MLP(n_obs, num_actions)
-        super().__init__(
-            env,
-            num_actions,
-            initial_epsilon,
-            epsilon_decay,
-            final_epsilon,
-            discount_factor,
-            buffer_size,
-            batch_size,
-            update_frequency,
-            update_target_frequency,
-            warmup_amt,
-            model_lr,
-            main,
-            delayed,
-            seed,
-            max_clip,
-            nstep_buffer_size,
-        )
-
-    def set_epsilon(self):
-        # Linear decays epsilon based on the number of frames processed.
-        self.eps_threshold = (
-            self.final_epsilon
-            + (self.initial_epsilon - self.final_epsilon)
-            * max(0, (self.epsilon_decay - self.frame_count))
-            / self.epsilon_decay
-        )
+        return loss, q, mean_max_q
 
     def reset_target_network(self):
         self.delayed_net.load_state_dict(self.main_net.state_dict())
 
 
 #####################################################################
-# Acrobot subclasses
+# Control Environment Agents (CartPole, MountainCar, Acrobot)
 #####################################################################
-class AcrobotDQNAgent(DQN):
+class ControlDQN(DQN):
+    """DQN agent for classic control environments using MLP."""
+
     def __init__(
         self,
         env: gym.Env,
@@ -1251,7 +946,9 @@ class AcrobotDQNAgent(DQN):
         )
 
 
-class AcrobotDDQNAgent(DDQN):
+class ControlDDQN(DDQN):
+    """DDQN agent for classic control environments using MLP."""
+
     def __init__(
         self,
         env: gym.Env,
@@ -1293,7 +990,9 @@ class AcrobotDDQNAgent(DDQN):
         )
 
 
-class AcrobotNStepDDQNAgent(nStepDDQN):
+class ControlNStepDDQN(nStepDDQN):
+    """N-Step DDQN agent for classic control environments using MLP."""
+
     def __init__(
         self,
         env: gym.Env,
