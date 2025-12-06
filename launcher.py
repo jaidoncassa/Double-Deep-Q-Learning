@@ -1,8 +1,10 @@
 import subprocess
 import time
 
+# SEEDS = [0, 42, 123]
+# ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
 SEEDS = [0, 42, 123]
-ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
+ALGORITHMS = ["DDQN", "DQN"]
 
 # Choose which environment to train on:
 # ENV_NAME = "PongNoFrameskip-v4"

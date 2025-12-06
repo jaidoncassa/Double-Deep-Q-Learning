@@ -26,6 +26,7 @@ class DQN:
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         main_net,
         delayed_net,
@@ -53,6 +54,7 @@ class DQN:
         # Neural Network initialization steps
         self.main_net = main_net
         self.update_frequency = update_frequency  # HYPERPARAM
+        self.warmup_amt = warmup_amt
 
         # Delayed target network for bootstrap yi
         self.delayed_net = delayed_net
@@ -250,17 +252,20 @@ class DQN:
         action = self.get_action(q_values)
 
         # Update the weights of the Neural Network every n steps past 32 steps
+        # Include a warmup
         q = None
         loss = None
         if (
-            self.frame_count % self.update_frequency == 0
+            self.frame_count % self.warmup_amt
+            and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
             loss, q = self.update_cnn_weights()
 
         # Reset the delayed network every m steps
         if (
-            self.frame_count > 0
+            self.frame_count % self.warmup_amt
+            and self.frame_count > 0
             and self.frame_count % self.update_target_frequency == 0
         ):
             self.reset_target_network()
@@ -331,6 +336,7 @@ class DDQN(DQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         main_net,
         delayed_net,
@@ -349,6 +355,7 @@ class DDQN(DQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main_net,
             delayed_net,
@@ -432,7 +439,7 @@ class DDQN(DQN):
         self.optimizer.zero_grad()
         loss.backward()
 
-        # ADDED: GRADIENT CLIPPING FOR STABILITY ***
+        # ADDED: GRADIENT CLIPPING FOR STABILITY
         torch.nn.utils.clip_grad_norm_(
             self.main_net.parameters(), max_norm=self.max_clip
         )
@@ -459,12 +466,13 @@ class nStepDDQN(DDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         main_net,
         delayed_net,
         seed: int,
-        max_clip: int,
-        nstep_buffer_size: int,
+        max_norm: int,
+        nstep_buffer_size=None,
     ):
         # Maintain two buffers now, think of the nstep_buffer as a sliding window
         self.nstep_buffer = deque(maxlen=nstep_buffer_size)
@@ -480,11 +488,12 @@ class nStepDDQN(DDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main_net,
             delayed_net,
             seed,
-            max_clip,
+            max_norm,
         )
 
     def update_cnn_weights(self):
@@ -629,6 +638,7 @@ class MsPacmanDQNAgent(DQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -647,6 +657,7 @@ class MsPacmanDQNAgent(DQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -691,6 +702,7 @@ class MsPacmanDDQNAgent(DDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -709,6 +721,7 @@ class MsPacmanDDQNAgent(DDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -738,6 +751,15 @@ class MsPacmanDDQNAgent(DDQN):
             / self.epsilon_decay
         )
 
+    def reset_target_network(self):
+        "Overwrite this method with hard-updates and soft-updates"
+        target_net_state_dict = self.delayed_net.state_dict()
+        policy_net_state_dict = self.main_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]
+        self.delayed_net.load_state_dict(target_net_state_dict)
+        return
+
 
 class MsPacmanNStepDDQNAgent(nStepDDQN):
     def __init__(
@@ -753,6 +775,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -771,6 +794,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -782,15 +806,6 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
     def transform(self, img):
         # Must normalize and turn into a tensor object
         return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
-
-    def reset_target_network(self):
-        "Overwrite this method with hard-updates and soft-updates"
-        target_net_state_dict = self.delayed_net.state_dict()
-        policy_net_state_dict = self.main_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]
-        self.delayed_net.load_state_dict(target_net_state_dict)
-        return
 
     def set_epsilon(self):
         # Linear decays epsilon based on the number of frames processed.
@@ -832,7 +847,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
 
         # Added a new warmup mechanism
         if (
-            self.frame_count > 50_000
+            self.frame_count > self.warmup_amt
             and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
@@ -840,7 +855,7 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
 
         # Reset the delayed network every m steps
         if (
-            self.frame_count > 50_000
+            self.frame_count > self.warmup_amt
             and self.frame_count > 0
             and self.frame_count % self.update_target_frequency == 0
         ):
@@ -885,6 +900,15 @@ class MsPacmanNStepDDQNAgent(nStepDDQN):
         self.prev_action = None
         return loss, q
 
+    def reset_target_network(self):
+        "Overwrite this method with hard-updates and soft-updates"
+        target_net_state_dict = self.delayed_net.state_dict()
+        policy_net_state_dict = self.main_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]
+        self.delayed_net.load_state_dict(target_net_state_dict)
+        return
+
 
 #####################################################################
 # CartPole subclasses
@@ -903,6 +927,7 @@ class CartPoleDQNAgent(DQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -921,6 +946,7 @@ class CartPoleDQNAgent(DQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -943,6 +969,7 @@ class CartPoleDDQNAgent(DDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -961,6 +988,7 @@ class CartPoleDDQNAgent(DDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -983,6 +1011,7 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1001,6 +1030,7 @@ class CartPoleNStepDDQNAgent(nStepDDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1027,6 +1057,7 @@ class MountainCarDQNAgent(DQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1045,6 +1076,7 @@ class MountainCarDQNAgent(DQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1060,6 +1092,9 @@ class MountainCarDQNAgent(DQN):
             * max(0, (self.epsilon_decay - self.frame_count))
             / self.epsilon_decay
         )
+
+    def reset_target_network(self):
+        self.delayed_net.load_state_dict(self.main_net.state_dict())
 
 
 class MountainCarDDQNAgent(DDQN):
@@ -1076,6 +1111,7 @@ class MountainCarDDQNAgent(DDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1094,6 +1130,7 @@ class MountainCarDDQNAgent(DDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1110,6 +1147,9 @@ class MountainCarDDQNAgent(DDQN):
             / self.epsilon_decay
         )
 
+    def reset_target_network(self):
+        self.delayed_net.load_state_dict(self.main_net.state_dict())
+
 
 class MountainCarNStepDDQNAgent(nStepDDQN):
     def __init__(
@@ -1125,6 +1165,7 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1143,6 +1184,7 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1159,6 +1201,9 @@ class MountainCarNStepDDQNAgent(nStepDDQN):
             * max(0, (self.epsilon_decay - self.frame_count))
             / self.epsilon_decay
         )
+
+    def reset_target_network(self):
+        self.delayed_net.load_state_dict(self.main_net.state_dict())
 
 
 #####################################################################
@@ -1178,6 +1223,7 @@ class AcrobotDQNAgent(DQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1196,6 +1242,7 @@ class AcrobotDQNAgent(DQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1218,6 +1265,7 @@ class AcrobotDDQNAgent(DDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1236,6 +1284,7 @@ class AcrobotDDQNAgent(DDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
@@ -1258,6 +1307,7 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
         batch_size: int,
         update_frequency: int,
         update_target_frequency: int,
+        warmup_amt: int,
         model_lr: float,
         seed: int,
         max_clip: int,
@@ -1276,6 +1326,7 @@ class AcrobotNStepDDQNAgent(nStepDDQN):
             batch_size,
             update_frequency,
             update_target_frequency,
+            warmup_amt,
             model_lr,
             main,
             delayed,
