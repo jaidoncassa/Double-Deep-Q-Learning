@@ -5,8 +5,8 @@ from pathlib import Path
 import gymnasium as gym
 import random
 import Agents
-import ale_py
 import torch
+import ale_py
 import argparse
 
 ENV_CONFIGS = {
@@ -18,7 +18,8 @@ ENV_CONFIGS = {
         "max_frames": 4_000_000,
         "max_steps_per_eps": 10_000,
         "update_target_frequency": 10_000,
-        "buffer_size": 1_000_000,
+        "warmup_amt": 20_000,
+        "buffer_size": 250_000,
         "update_frequency": 4,
         "batch_size": 32,
         "LR": 1e-4,
@@ -165,7 +166,7 @@ def main():
     NSTEP = args.nstep
 
     SAVE_RATE = 500_000
-    FRAME_UPDATE = 10_000
+    FRAME_UPDATE = 5_000
 
     # Grab the game to run
     game = ENV_CONFIGS[ENV_NAME]
@@ -177,7 +178,7 @@ def main():
     print(f"N-step: {NSTEP}\n")
 
     # Initialize the environment
-    env = gym.make(ENV_NAME)
+    env = gym.make("PongNoFrameskip-v4")
 
     if game["is_atari"]:
         env = AtariPreprocessing(
@@ -203,7 +204,7 @@ def main():
 
     # Environment settings
     state, _ = env.reset()
-    n_observations = len(state)
+    n_observations = len(state) if not game["is_atari"] else None
     num_actions = env.action_space.n
     MAX_EPISODES = game["max_episodes"]
     MAX_FRAMES = game["max_frames"]

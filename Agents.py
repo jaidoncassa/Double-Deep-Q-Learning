@@ -10,6 +10,25 @@ import torch
 import math
 
 
+class LazyFrames:
+    """Optimizes memory by avoiding duplicated frame storage in frame stacks."""
+
+    def __init__(self, frames):
+        self._frames = frames
+
+    def __array__(self, dtype=None):
+        out = np.concatenate(self._frames, axis=0)  # (4,84,84) stacked
+        if dtype is not None:
+            out = out.astype(dtype)
+        return out
+
+    def __len__(self):
+        return len(self._frames)
+
+    def __getitem__(self, i):
+        return self._frames[i]
+
+
 #####################################################################
 # Main superclasses
 #####################################################################
@@ -645,6 +664,7 @@ class AtariDQNAgent(DQN):
         self,
         env: gym.Env,
         num_actions: int,
+        n_obs: int | None,
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
@@ -680,9 +700,13 @@ class AtariDQNAgent(DQN):
             max_clip,
         )
 
-    def transform(self, img):
-        # Must normalize and turn into a tensor object
-        return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+    def transform(self, state):
+        # Convert LazyFrames to numpy array automatically
+        if isinstance(state, LazyFrames):
+            state = np.array(state)
+
+        # Now state is np.ndarray shape (4,84,84)
+        return torch.from_numpy(state).float().unsqueeze(0).to(self.device) / 255.0
 
     def reset_target_network(self):
         self.delayed_net.load_state_dict(self.main_net.state_dict())
@@ -695,6 +719,18 @@ class AtariDQNAgent(DQN):
             * max(0, (self.epsilon_decay - self.frame_count))
             / self.epsilon_decay
         )
+
+    def push_transition(self, transition):
+        # transition = (state, action, reward, next_state, done)
+        state, action, reward, next_state, done = transition
+
+        # Wrap the state using LazyFrames
+        if state is not None:
+            state = LazyFrames(list(state))
+        if next_state is not None:
+            next_state = LazyFrames(list(next_state))
+
+        self.replay_buffer.append((state, action, reward, next_state, done))
 
 
 class AtariDDQNAgent(DDQN):
@@ -702,7 +738,7 @@ class AtariDDQNAgent(DDQN):
         self,
         env: gym.Env,
         num_actions: int,
-        n_obs: int,
+        n_obs: int | None,
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
@@ -738,9 +774,13 @@ class AtariDDQNAgent(DDQN):
             max_clip,
         )
 
-    def transform(self, img):
-        # Must normalize and turn into a tensor object
-        return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+    def transform(self, state):
+        # Convert LazyFrames to numpy array automatically
+        if isinstance(state, LazyFrames):
+            state = np.array(state)
+
+        # Now state is np.ndarray shape (4,84,84)
+        return torch.from_numpy(state).float().unsqueeze(0).to(self.device) / 255.0
 
     def set_epsilon(self):
         # Linear decays epsilon based on the number of frames processed.
@@ -754,13 +794,25 @@ class AtariDDQNAgent(DDQN):
     def reset_target_network(self):
         self.delayed_net.load_state_dict(self.main_net.state_dict())
 
+    def push_transition(self, transition):
+        # transition = (state, action, reward, next_state, done)
+        state, action, reward, next_state, done = transition
+
+        # Wrap the state using LazyFrames
+        if state is not None:
+            state = LazyFrames(list(state))
+        if next_state is not None:
+            next_state = LazyFrames(list(next_state))
+
+        self.replay_buffer.append((state, action, reward, next_state, done))
+
 
 class AtariNStepDDQNAgent(nStepDDQN):
     def __init__(
         self,
         env: gym.Env,
         num_actions: int,
-        n_obs: int,
+        n_obs: int | None,
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
@@ -797,9 +849,13 @@ class AtariNStepDDQNAgent(nStepDDQN):
             nstep_buffer_size,
         )
 
-    def transform(self, img):
-        # Must normalize and turn into a tensor object
-        return torch.from_numpy(img).float().unsqueeze(0).to(device=self.device) / 255.0
+    def transform(self, state):
+        # Convert LazyFrames to numpy array automatically
+        if isinstance(state, LazyFrames):
+            state = np.array(state)
+
+        # Now state is np.ndarray shape (4,84,84)
+        return torch.from_numpy(state).float().unsqueeze(0).to(self.device) / 255.0
 
     def set_epsilon(self):
         # Linear decays epsilon based on the number of frames processed.
@@ -877,7 +933,7 @@ class AtariNStepDDQNAgent(nStepDDQN):
         mean_max_q = None
         # Added a new warmup mechanism
         if (
-            self.frame_count > 50_000
+            self.frame_count > self.warmup_amt
             and self.frame_count % self.update_frequency == 0
             and len(self.replay_buffer) > self.batch_size
         ):
@@ -885,7 +941,7 @@ class AtariNStepDDQNAgent(nStepDDQN):
 
         # Reset the delayed network every m steps
         if (
-            self.frame_count > 50_000
+            self.frame_count > self.warmup_amt
             and self.frame_count > 0
             and self.frame_count % self.update_target_frequency == 0
         ):
@@ -897,6 +953,29 @@ class AtariNStepDDQNAgent(nStepDDQN):
 
     def reset_target_network(self):
         self.delayed_net.load_state_dict(self.main_net.state_dict())
+
+    def push_transition(self, transition):
+        # transition = (state, action, reward, next_state, done)
+        state, action, reward, next_state, done = transition
+
+        # Wrap the state using LazyFrames
+        if state is not None:
+            state = LazyFrames(list(state))
+        if next_state is not None:
+            next_state = LazyFrames(list(next_state))
+
+        # Store the wrapped transition
+        new_transition = (state, action, reward, next_state, done)
+        self.nstep_buffer.append(new_transition)
+
+        # If terminal, flush shorter ones
+        if done:
+            self.flush_nstep_buffer()
+            return
+
+        if len(self.nstep_buffer) == self.nstep_buffer.maxlen:
+            # Create full n-step transition
+            self.create_and_store_nstep()
 
 
 #####################################################################

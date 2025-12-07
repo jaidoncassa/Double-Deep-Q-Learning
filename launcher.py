@@ -4,6 +4,9 @@ import time
 SEEDS = [0, 42, 123]
 ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
 
+# SEEDS = [0]
+# ALGORITHMS = ["DQN"]
+
 # SEEDS = [0, 42, 123]
 # ALGORITHMS = ["DDQN", "DQN"]
 
@@ -16,7 +19,7 @@ ENV_NAME = "PongNoFrameskip-v4"
 NSTEP_VALUES = [3]
 
 # Python executable (change to "python3" if needed)
-PYTHON = "python"
+PYTHON = r"C:\Users\Jaidon\School_projects\496\.venv\Scripts\python.exe"
 
 # Path to training script
 TRAIN_SCRIPT = "train_agents.py"
