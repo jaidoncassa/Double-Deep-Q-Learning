@@ -1,7 +1,7 @@
 import subprocess
 import time
 
-SEEDS = [0, 42, 123]
+SEEDS = [42, 123]
 ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
 
 # SEEDS = [0]

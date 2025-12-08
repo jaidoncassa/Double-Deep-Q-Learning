@@ -17,7 +17,7 @@ class LazyFrames:
         self._frames = frames
 
     def __array__(self, dtype=None):
-        out = np.concatenate(self._frames, axis=0)  # (4,84,84) stacked
+        out = np.stack(self._frames, axis=0)
         if dtype is not None:
             out = out.astype(dtype)
         return out
@@ -132,7 +132,7 @@ class DQN:
         )
 
         # Transform and concatenate all batch elements
-        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        state_batch = torch.stack([self.transform(s).squeeze(0) for s in batch.state])
         action_batch = torch.tensor(
             batch.action, dtype=torch.long, device=self.device
         ).unsqueeze(1)
@@ -142,8 +142,8 @@ class DQN:
 
         # Transform and concatenate non-final next states
         if non_final_next_states_np:
-            non_final_next_states = torch.cat(
-                [self.transform(s) for s in non_final_next_states_np]
+            non_final_next_states = torch.stack(
+                [self.transform(s).squeeze(0) for s in non_final_next_states_np]
             )
         else:
             non_final_next_states = torch.empty(
@@ -406,7 +406,7 @@ class DDQN(DQN):
         )
 
         # Transform and concatenate all batch elements
-        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        state_batch = torch.stack([self.transform(s).squeeze(0) for s in batch.state])
         action_batch = torch.tensor(
             batch.action, dtype=torch.long, device=self.device
         ).unsqueeze(1)
@@ -416,8 +416,8 @@ class DDQN(DQN):
 
         # Transform and concatenate non-final next states
         if non_final_next_states_np:
-            non_final_next_states = torch.cat(
-                [self.transform(s) for s in non_final_next_states_np]
+            non_final_next_states = torch.stack(
+                [self.transform(s).squeeze(0) for s in non_final_next_states_np]
             )
         else:
             non_final_next_states = torch.empty(
@@ -545,7 +545,7 @@ class nStepDDQN(DDQN):
         )
 
         # Transform and concatenate all batch elements
-        state_batch = torch.cat([self.transform(s) for s in batch.state])
+        state_batch = torch.stack([self.transform(s).squeeze(0) for s in batch.state])
         action_batch = torch.tensor(
             batch.action, dtype=torch.long, device=self.device
         ).unsqueeze(1)
@@ -555,8 +555,8 @@ class nStepDDQN(DDQN):
 
         # Transform and concatenate non-final next states
         if non_final_next_states_np:
-            non_final_next_states = torch.cat(
-                [self.transform(s) for s in non_final_next_states_np]
+            non_final_next_states = torch.stack(
+                [self.transform(s).squeeze(0) for s in non_final_next_states_np]
             )
         else:
             non_final_next_states = torch.empty(
@@ -854,6 +854,8 @@ class AtariNStepDDQNAgent(nStepDDQN):
         if isinstance(state, LazyFrames):
             state = np.array(state)
 
+        assert state.shape == (4, 84, 84), f"BAD SHAPE: {state.shape}"
+
         # Now state is np.ndarray shape (4,84,84)
         return torch.from_numpy(state).float().unsqueeze(0).to(self.device) / 255.0
 
@@ -880,6 +882,8 @@ class AtariNStepDDQNAgent(nStepDDQN):
         """
         # Save the full observation (s, a, R, s')
         obs = (self.prev_state, self.prev_action, reward, state, False)
+
+        # Converts states into LazyFrames objects
         self.push_transition(obs)
 
         # Turn into Torcher vector

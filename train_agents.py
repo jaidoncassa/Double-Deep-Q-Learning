@@ -15,11 +15,11 @@ ENV_CONFIGS = {
     # -----------------------------
     "PongNoFrameskip-v4": {
         "max_episodes": None,
-        "max_frames": 4_000_000,
+        "max_frames": 3_500_000,
         "max_steps_per_eps": 10_000,
         "update_target_frequency": 10_000,
-        "warmup_amt": 20_000,
-        "buffer_size": 250_000,
+        "warmup_amt": 10_000,
+        "buffer_size": 125_000,
         "update_frequency": 4,
         "batch_size": 32,
         "LR": 1e-4,
