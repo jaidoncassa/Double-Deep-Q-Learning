@@ -9,7 +9,9 @@ import pandas as pd
 #  Settings for plotting learning curves
 ############################################################################
 seeds = [0, 42, 123]
+n_steps = [3, 5, 6]
 metrics = ["Reward", "Loss"]
+# metrics = ["Reward", "Loss", "Mean_Max_Q"]
 end_1 = "0_checkpoints/episode_metrics.csv"
 end_2 = "42_checkpoints/episode_metrics.csv"
 end_3 = "123_checkpoints/episode_metrics.csv"
@@ -24,9 +26,10 @@ end_qn_1 = "3_checkpoints/log.csv"
 end_qn_2 = "5_checkpoints/log.csv"
 end_qn_3 = "6_checkpoints/log.csv"
 environments = ["Acrobot-v1", "CartPole-v1", "MountainCar-v0"]
+# environments = ["PongNoFrameskip-v4"]
 
 
-def load_csv_series(path, column="Reward", names=["Reward", "Loss", "Length"]):
+def load_csv_series(path, column="Reward"):
     df = pd.read_csv(
         path,
         sep=r"\s+",
@@ -167,72 +170,10 @@ for episode in range(EPISODES):
 env.close()
 """
 
-
-############################################################################
-# Plotting different N-step values for N-step DDQN
-############################################################################
-n_steps = [3, 5, 6]
-colors = {"N-step=3": "orange", "N-step=5": "blue", "N-step=6": "green"}
-
-
-def nstepddqn_comparison():
-    for env_name in environments:
-        for metric in metrics:
-            plot_ddqn_style(
-                metric_dict={
-                    "N-step=3": [
-                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_1}",
-                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_1}",
-                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_1}",
-                    ],
-                    "N-step=5": [
-                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_2}",
-                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_2}",
-                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_2}",
-                    ],
-                    "N-step=6": [
-                        f"{env_name}_Environment/nstepddqn/seed_0/{end_n_3}",
-                        f"{env_name}_Environment/nstepddqn/seed_42/{end_n_3}",
-                        f"{env_name}_Environment/nstepddqn/seed_123/{end_n_3}",
-                    ],
-                },
-                title=f"{env_name} {metric} Learning Curve for different N values",
-                ylabel=metric,
-                colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_nstepddqn_comparison.png",
-            )
-
-
 ############################################################################
 # Plotting DQN vs DDQN vs NstepDDQN Learning Curves
 ############################################################################
-def dqn_vs_ddqn():
-    colors = {"DQN": "orange", "DDQN": "blue"}
-    for env_name in environments:
-        metric_dict = {
-            "DQN": [
-                f"{env_name}_Environment/dqn/{end_1}",
-                f"{env_name}_Environment/dqn/{end_2}",
-                f"{env_name}_Environment/dqn/{end_3}",
-            ],
-            "DDQN": [
-                f"{env_name}_Environment/ddqn/{end_1}",
-                f"{env_name}_Environment/ddqn/{end_2}",
-                f"{env_name}_Environment/ddqn/{end_3}",
-            ],
-        }
-        for metric in metrics:
-            # Plot DQN vs DDQN Metrics averaged and quantiled over seeds
-            plot_ddqn_style(
-                metric_dict=metric_dict,
-                title=f"{env_name} {metric} Learning Curve",
-                ylabel=metric,
-                colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn.png",
-            )
-
-
-def dqn_vs_ddqn_nstep():
+def dqn_vs_ddqn_nstep(n):
     colors = {"DQN": "orange", "DDQN": "blue", "NstepDDQN": "green"}
     for env_name in environments:
         for metric in metrics:
@@ -258,7 +199,7 @@ def dqn_vs_ddqn_nstep():
                 title=f"{env_name} {metric} Learning Curve",
                 ylabel=metric,
                 colors=colors,
-                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn_nstepddqn.png",
+                save_path=f"plots/{env_name.lower()}_{metric.lower()}_dqn_ddqn_nstepddqn-{n}.png",
             )
 
 
@@ -323,18 +264,6 @@ def plot_qvalues(metric_dict, title, colors, save_path):
 
 
 def qvalues_dqn_vs_ddqn_nstep():
-
-    """
-    Docstring for qvalues_dqn_vs_ddqn_nstep
-    
-end_q_1 = "0_checkpoints/log.csv"
-end_q_2 = "42_checkpoints/log.csv"
-end_q_3 = "123_checkpoints/log.csv"
-end_qn_1 = "3_checkpoints/log.csv"
-end_qn_2 = "5_checkpoints/log.csv"
-end_qn_3 = "6_checkpoints/log.csv"
-    """
-    
     colors = {"DQN": "orange", "DDQN": "blue", "NstepDDQN": "green"}
 
     for env_name in environments:
@@ -352,9 +281,9 @@ end_qn_3 = "6_checkpoints/log.csv"
                     f"{env_name}_Environment/ddqn/{end_q_3}",
                 ],
                 "NstepDDQN": [
-                    f"{env_name}_Environment/nstepddqn/seed_0/{end_qn_1}",
-                    f"{env_name}_Environment/nstepddqn/seed_42/{end_qn_1}",
-                    f"{env_name}_Environment/nstepddqn/seed_123/{end_qn_1}",
+                    f"{env_name}_Environment/nstepddqn/seed_0/{end_qn_2 if env_name != "PongNoFrameskip-v4" else end_qn_1}",
+                    f"{env_name}_Environment/nstepddqn/seed_42/{end_qn_2 if env_name != "PongNoFrameskip-v4" else end_qn_1}",
+                    f"{env_name}_Environment/nstepddqn/seed_123/{end_qn_2 if env_name != "PongNoFrameskip-v4" else end_qn_1}",
                 ],
             },
             title=f"{env_name} Moving Avg Q-Value (Across Seeds)",
@@ -364,8 +293,7 @@ end_qn_3 = "6_checkpoints/log.csv"
 
 
 def main():
-    dqn_vs_ddqn_nstep()
-    qvalues_dqn_vs_ddqn_nstep()
-
+    dqn_vs_ddqn_nstep() # per step reward
+    qvalues_dqn_vs_ddqn_nstep() # Moving Q's
 
 main()
