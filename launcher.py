@@ -1,18 +1,18 @@
 import subprocess
 import time
 
-SEEDS = [123]
-# ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
+# Choose which seeds to drive with
+SEEDS = [0, 42, 123]
 
-# SEEDS = [0]
-ALGORITHMS = ["nStepDDQN"]
-
-# SEEDS = [0, 42, 123]
-# ALGORITHMS = ["DDQN", "DQN"]
+# Choose with algorithms to train with
+ALGORITHMS = ["nStepDDQN", "DQN", "DDQN"]
 
 # Choose which environment to train on:
 ENV_NAME = "PongNoFrameskip-v4"
 # ENV_NAME = "MountainCar-v0"
+# ENV_NAME = "CartPole-v1"
+# ENV_NAME = "Acrobot-v1"
+# ENV_NAME = "MsPacmanNoFrameskip-v4"
 
 
 # N-step value to use when algo == "nStepDDQN"

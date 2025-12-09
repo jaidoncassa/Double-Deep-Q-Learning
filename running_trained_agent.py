@@ -7,31 +7,32 @@ import gymnasium as gym
 import ale_py
 import torch
 
+envs = ["PongNoFrameskip-v4", "MsPacmanNoFrameskip-v4", "MountainCar-v0", "Acrobot-v1", "CartPole-v1"]
+ENV_NAME = envs[0]
+
 # Initialize the environment
-env = gym.make("PongNoFrameskip-v4", render_mode="human", difficulty=1)
+env = gym.make(ENV_NAME, render_mode="human", difficulty=1)
 
-# # Render the state space as a square 84x84 gray image
-env = AtariPreprocessing(
-    env,
-    noop_max=10,
-    terminal_on_life_loss=False,
-    screen_size=84,
-    grayscale_obs=True,
-    grayscale_newaxis=False,
-)
+if ENV_NAME == envs[0] or envs[1]:
+    # # Render the state space as a square 84x84 gray image
+    env = AtariPreprocessing(
+        env,
+        noop_max=10,
+        terminal_on_life_loss=False,
+        screen_size=84,
+        grayscale_obs=True,
+        grayscale_newaxis=False,
+    )
 
-env = FrameStackObservation(env, 4)
+    env = FrameStackObservation(env, 4)
 
-
-# def transform(state):
-#     t = torch.tensor(state, dtype=torch.float32)
-#     return t.unsqueeze(0)
-
-
-def transform(img):
-    # Must normalize and turn into a tensor object
-    return torch.from_numpy(img).float().unsqueeze(0) / 255.0
-
+    def transform(img):
+        # Must normalize and turn into a tensor object
+        return torch.from_numpy(img).float().unsqueeze(0) / 255.0
+else:
+    def transform(state):
+        t = torch.tensor(state, dtype=torch.float32)
+        return t.unsqueeze(0)
 
 state, info = env.reset()
 num_actions = env.action_space.n

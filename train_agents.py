@@ -117,7 +117,7 @@ ENV_CONFIGS = {
     # -----------------------------
     # Classic Control: Cartpole-v1
     # -----------------------------
-    "Cartpole-v1": {
+    "CartPole-v1": {
         "max_episodes": 600,
         "max_steps_per_eps": 500,
         "max_frames": None,
