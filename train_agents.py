@@ -15,7 +15,7 @@ ENV_CONFIGS = {
     # -----------------------------
     "PongNoFrameskip-v4": {
         "max_episodes": None,
-        "max_frames": 3_500_000,
+        "max_frames": 2_900_000,
         "max_steps_per_eps": 10_000,
         "update_target_frequency": 10_000,
         "warmup_amt": 10_000,
