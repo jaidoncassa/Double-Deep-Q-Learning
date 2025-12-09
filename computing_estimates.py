@@ -9,24 +9,31 @@ import pandas as pd
 #  Settings for plotting learning curves
 ############################################################################
 seeds = [0, 42, 123]
-metrics = ["Reward", "Loss", "Length"]
+metrics = ["Reward", "Loss"]
 end_1 = "0_checkpoints/episode_metrics.csv"
 end_2 = "42_checkpoints/episode_metrics.csv"
 end_3 = "123_checkpoints/episode_metrics.csv"
 end_n_1 = "3_checkpoints/episode_metrics.csv"
 end_n_2 = "5_checkpoints/episode_metrics.csv"
 end_n_3 = "6_checkpoints/episode_metrics.csv"
-environments = ["Acrobot-v1", "CartPole-v1"]
+
+end_q_1 = "0_checkpoints/log.csv"
+end_q_2 = "42_checkpoints/log.csv"
+end_q_3 = "123_checkpoints/log.csv"
+end_qn_1 = "3_checkpoints/log.csv"
+end_qn_2 = "5_checkpoints/log.csv"
+end_qn_3 = "6_checkpoints/log.csv"
+environments = ["Acrobot-v1", "CartPole-v1", "MountainCar-v0"]
 
 
-def load_csv_series(path, column="Reward"):
+def load_csv_series(path, column="Reward", names=["Reward", "Loss", "Length"]):
     df = pd.read_csv(
         path,
-        skiprows=1,
         sep=r"\s+",
-        names=["Reward", "Loss", "Length"],
         engine="python",
     )
+
+    # print(df[column].head())
     return df[column].to_numpy()
 
 
@@ -35,17 +42,35 @@ def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
     metric_dict = {
         "DQN":  [file_seed1.csv, file_seed2.csv, file_seed3.csv],
         "DDQN": [file_seed1.csv, file_seed2.csv, file_seed3.csv],
+        "NstepDDQN": [...]
     }
     """
 
     plt.figure(figsize=(10, 6))
 
+    # -------------------------------------------------------
+    # 1) Load ALL curves first to find global minimum length
+    # -------------------------------------------------------
+    all_curves = []
+    for algo, file_list in metric_dict.items():
+        for f in file_list:
+            arr = load_csv_series(f, column=ylabel)
+            all_curves.append(arr)
+
+    min_len = min(len(arr) for arr in all_curves)
+    print(f"[Clip] Global minimum length across all seeds = {min_len}")
+
+    # -------------------------------------------------------
+    # 2) Plot each algorithm using clipped curves
+    # -------------------------------------------------------
     for algo, file_list in metric_dict.items():
 
-        # Load all seeds for this algorithm
-        curves = [load_csv_series(f, column=ylabel) for f in file_list]
+        # Load & clip each seed curve
+        curves = [
+            load_csv_series(f, column=ylabel)[:min_len]
+            for f in file_list
+        ]
 
-        # Stack into array shape (seeds, episodes)
         arr = np.vstack(curves)
 
         # Compute median and quantiles
@@ -53,12 +78,12 @@ def plot_ddqn_style(metric_dict, title, ylabel, colors, save_path):
         q10 = np.quantile(arr, 0.10, axis=0)
         q90 = np.quantile(arr, 0.90, axis=0)
 
-        x = np.arange(len(median))
+        x = np.arange(min_len)
 
-        # Plot median
+        # Plot median line
         plt.plot(x, median, label=algo, color=colors[algo], linewidth=2)
 
-        # Plot quantile shading
+        # Quantile shading
         plt.fill_between(x, q10, q90, color=colors[algo], alpha=0.2)
 
     plt.title(title, fontsize=16)
@@ -237,9 +262,110 @@ def dqn_vs_ddqn_nstep():
             )
 
 
+############################################################################
+# Plotting DQN vs DDQN vs NstepDDQN Q Curves
+############################################################################
+def plot_qvalues(metric_dict, title, colors, save_path):
+    """
+    metric_dict = {
+        "DQN":  [path1, path2, path3],
+        "DDQN": [...],
+        "NstepDDQN": [...]
+    }
+    """
+
+    plt.figure(figsize=(10, 6))
+
+    # -------------------------------------------------------
+    # 1) Load ALL raw curves first to inspect their lengths
+    # -------------------------------------------------------
+    all_curves = []
+
+    for algo, file_list in metric_dict.items():
+        for f in file_list:
+            arr = load_csv_series(f, column="MeanQValue")
+            all_curves.append(arr)
+
+    # -------------------------------------------------------
+    # 2) Find global minimum length across ALL algorithms
+    # -------------------------------------------------------
+    min_len = min(len(arr) for arr in all_curves)
+    print("Global minimum training length =", min_len)
+
+    # -------------------------------------------------------
+    # 3) Now reprocess algorithm by algorithm with trimming
+    # -------------------------------------------------------
+    for algo, file_list in metric_dict.items():
+
+        curves = [
+            load_csv_series(f, column="MeanQValue")[:min_len]
+            for f in file_list
+        ]
+
+        arr = np.vstack(curves)
+
+        median = np.median(arr, axis=0)
+        q10 = np.quantile(arr, 0.10, axis=0)
+        q90 = np.quantile(arr, 0.90, axis=0)
+
+        x = np.arange(min_len)
+
+        plt.plot(x, median, label=algo, color=colors[algo], linewidth=2)
+        plt.fill_between(x, q10, q90, color=colors[algo], alpha=0.2)
+
+    plt.title(title)
+    plt.xlabel("Episode")
+    plt.ylabel("MeanQValue")
+    plt.grid(alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path)
+
+
+def qvalues_dqn_vs_ddqn_nstep():
+
+    """
+    Docstring for qvalues_dqn_vs_ddqn_nstep
+    
+end_q_1 = "0_checkpoints/log.csv"
+end_q_2 = "42_checkpoints/log.csv"
+end_q_3 = "123_checkpoints/log.csv"
+end_qn_1 = "3_checkpoints/log.csv"
+end_qn_2 = "5_checkpoints/log.csv"
+end_qn_3 = "6_checkpoints/log.csv"
+    """
+    
+    colors = {"DQN": "orange", "DDQN": "blue", "NstepDDQN": "green"}
+
+    for env_name in environments:
+
+        plot_qvalues(
+            metric_dict={
+                "DQN": [
+                    f"{env_name}_Environment/dqn/{end_q_1}",
+                    f"{env_name}_Environment/dqn/{end_q_2}",
+                    f"{env_name}_Environment/dqn/{end_q_3}",
+                ],
+                "DDQN": [
+                    f"{env_name}_Environment/ddqn/{end_q_1}",
+                    f"{env_name}_Environment/ddqn/{end_q_2}",
+                    f"{env_name}_Environment/ddqn/{end_q_3}",
+                ],
+                "NstepDDQN": [
+                    f"{env_name}_Environment/nstepddqn/seed_0/{end_qn_1}",
+                    f"{env_name}_Environment/nstepddqn/seed_42/{end_qn_1}",
+                    f"{env_name}_Environment/nstepddqn/seed_123/{end_qn_1}",
+                ],
+            },
+            title=f"{env_name} Moving Avg Q-Value (Across Seeds)",
+            colors=colors,
+            save_path=f"plots/{env_name.lower()}_meanqvalue_dqn_ddqn_nstepddqn.png",
+        )
+
+
 def main():
-    nstepddqn_comparison()
     dqn_vs_ddqn_nstep()
+    qvalues_dqn_vs_ddqn_nstep()
 
 
 main()

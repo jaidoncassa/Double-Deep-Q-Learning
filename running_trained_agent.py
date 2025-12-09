@@ -8,7 +8,7 @@ import ale_py
 import torch
 
 # Initialize the environment
-env = gym.make("PongNoFrameskip-v4", render_mode="human")
+env = gym.make("PongNoFrameskip-v4", render_mode="human", difficulty=1)
 
 # # Render the state space as a square 84x84 gray image
 env = AtariPreprocessing(
@@ -46,7 +46,7 @@ n_obs = len(state)
 model = CNN(num_actions=num_actions)
 model.load_state_dict(
     torch.load(
-        "PongNoFrameskip-v4_Environment/nstepddqn/seed_0/3_checkpoints/nstepddqn_1_agent.pt"
+        "PongNoFrameskip-v4_Environment/nstepddqn/seed_0/3_checkpoints/nstepddqn_7_agent.pt"
     )
 )
 # model.load_state_dict(

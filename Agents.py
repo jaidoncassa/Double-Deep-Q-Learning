@@ -155,7 +155,7 @@ class DQN:
         q_values_all = self.main_net(state_batch)  # shape [B, A]
         state_action_values = q_values_all.gather(1, action_batch)
 
-        # For loggic purposes, I want to log the maximization bias by observing the max action from the current main network
+        # For logging purposes, I want to log the maximization bias by observing the max action from the current main network
         with torch.no_grad():
             mean_max_q = q_values_all.max(1).values.mean().item()
 
